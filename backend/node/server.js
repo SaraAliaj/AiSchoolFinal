@@ -274,8 +274,21 @@ app.post('/api/auth/login', async (req, res) => {
       active: true 
     });
 
-    // Ensure role is one of the valid values
-    const validRole = ['student', 'lead_student', 'admin'].includes(user.role) ? user.role : 'student';
+    // Map the role to one of the valid values
+    let validRole = 'student';
+    if (user.role) {
+      const role = user.role.toLowerCase();
+      if (['student', 'lead_student', 'admin'].includes(role)) {
+        validRole = role;
+      }
+    }
+
+    console.log('User logged in successfully:', {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: validRole
+    });
 
     res.json({
       token,
