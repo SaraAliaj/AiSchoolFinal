@@ -21,8 +21,7 @@ dist-ssr
 backup
 quiz-challenge-portal
 uploads
-src
-public
+
 
 # Editor directories and files
 .vscode/*

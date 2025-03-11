@@ -1,0 +1,23 @@
+/* Split.js styles */
+.split-container {
+  display: flex;
+}
+
+.gutter {
+  background-color: transparent;
+  position: relative;
+}
+
+.gutter:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.gutter.gutter-horizontal {
+  cursor: col-resize;
+}
+
+/* Hide PDF viewer controls */
+embed[type="application/pdf"] {
+  border: none;
+  background: white;
+} 
