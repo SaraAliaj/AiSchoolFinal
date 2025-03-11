@@ -20,15 +20,12 @@ services:
     dockerContext: .
     dockerfilePath: ./Dockerfile.mysql
     healthCheckPath: /
-    healthCheckTimeout: 300
 
   # Node.js Backend service
   - type: web
     name: quiz-node-backend
     env: node
     plan: starter
-    runtime: node
-    nodeVersion: 18.x
     buildCommand: cd backend/node && npm install
     startCommand: cd backend/node && npm start
     healthCheckPath: /health
@@ -69,8 +66,6 @@ services:
     healthCheckPath: /health
     autoDeploy: true
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.9.0
       - key: PORT
         value: 8000
       - key: ENV
@@ -99,10 +94,6 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
-    headers:
-      - path: /*
-        name: Access-Control-Allow-Origin
-        value: "*"
 
   # Frontend static site
   - type: web
@@ -111,10 +102,6 @@ services:
     plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
-    headers:
-      - path: /*
-        name: Cache-Control
-        value: no-cache
     envVars:
       - key: VITE_NODE_API_URL
         fromService:
