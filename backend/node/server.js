@@ -271,10 +271,19 @@ app.post('/api/auth/login', async (req, res) => {
     const username = user.username || (user.name ? user.name.split(' ')[0] : 'User');
     const surname = user.surname || (user.name ? user.name.split(' ').slice(1).join(' ') : '');
 
-    // Ensure role is one of the valid values
-    const validRole = ['student', 'lead_student', 'admin'].includes(user.role?.toLowerCase()) 
-      ? user.role.toLowerCase() 
+    // Default role to 'student' if not set or invalid
+    const validRole = user.role && ['student', 'lead_student', 'admin'].includes(user.role.toLowerCase())
+      ? user.role.toLowerCase()
       : 'student';
+
+    // Update user's role in database if it's not set
+    if (!user.role) {
+      console.log('Setting default role for user:', user.id);
+      await promisePool.query(
+        'UPDATE users SET role = ? WHERE id = ?',
+        [validRole, user.id]
+      );
+    }
 
     console.log('User logged in successfully:', {
       id: user.id,
@@ -304,7 +313,7 @@ app.post('/api/auth/login', async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error during login' });
   }
 });
 
@@ -358,17 +367,17 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
 
-    // Insert new user
+    // Insert new user with default role 'student'
     const [result] = await promisePool.query(
-      'INSERT INTO users (username, surname, email, password, role) VALUES (?, ?, ?, ?, ?)',
-      [username, surname, email, hashedPassword, 'user'] // Default role is 'user'
+      'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
+      [username, surname, email, hashedPassword, 'student', true]
     );
 
     console.log('User registered successfully:', { id: result.insertId });
 
     const token = jwt.sign(
       { userId: result.insertId, email },
-      JWT_SECRET || 'fallback-secret-key',
+      JWT_SECRET,
       { expiresIn: '24h' }
     );
 
@@ -377,40 +386,15 @@ app.post('/api/auth/register', async (req, res) => {
       user: {
         id: result.insertId,
         username,
-        email,
         surname,
-        role: 'user' // Default role
+        email,
+        role: 'student',
+        active: true
       }
     });
   } catch (error) {
-    console.error('Registration error details:', {
-      error: error.message,
-      code: error.code,
-      sqlMessage: error.sqlMessage,
-      stack: error.stack
-    });
-    
-    // Send more specific error messages
-    if (error.code === 'ER_DUP_ENTRY') {
-      res.status(400).json({ message: 'Email already registered' });
-    } else if (error.code === 'ER_NO_SUCH_TABLE') {
-      console.error('Database table not found');
-      res.status(500).json({ 
-        message: 'Database configuration error',
-        details: 'Table not found'
-      });
-    } else if (error.code === 'ECONNREFUSED') {
-      console.error('Database connection failed');
-      res.status(500).json({ 
-        message: 'Database connection error',
-        details: 'Could not connect to database'
-      });
-    } else {
-      res.status(500).json({ 
-        message: 'Server error during registration',
-        details: error.message 
-      });
-    }
+    console.error('Registration error:', error);
+    res.status(500).json({ message: 'Server error during registration' });
   }
 });
 

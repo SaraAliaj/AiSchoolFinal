@@ -26,6 +26,14 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Helper function to validate and normalize role
+const validateRole = (role?: string): 'student' | 'lead_student' | 'admin' => {
+  if (!role || !['student', 'lead_student', 'admin'].includes(role.toLowerCase())) {
+    return 'student';
+  }
+  return role.toLowerCase() as 'student' | 'lead_student' | 'admin';
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState<User | null>(null);
@@ -42,10 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = localStorage.getItem('user');
         if (userData) {
           const parsedUser = JSON.parse(userData);
-          // Ensure user has a role property, default to 'user' if not present
-          if (!parsedUser.role) {
-            parsedUser.role = 'user';
-          }
+          // Ensure user has a valid role
+          parsedUser.role = validateRole(parsedUser.role);
           setUser(parsedUser);
           setIsAuthenticated(true);
           return true;
@@ -64,10 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = localStorage.getItem('user');
       if (userData) {
         const parsedUser = JSON.parse(userData);
-        // Ensure user has a role property, default to 'user' if not present
-        if (!parsedUser.role) {
-          parsedUser.role = 'user';
-        }
+        // Ensure user has a valid role
+        parsedUser.role = validateRole(parsedUser.role);
         setUser(parsedUser);
         setIsAuthenticated(true);
         return true;
@@ -91,10 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // If server is unreachable, still use cached credentials
           setIsAuthenticated(true);
           const parsedUser = JSON.parse(userData);
-          // Ensure user has a role property, default to 'user' if not present
-          if (!parsedUser.role) {
-            parsedUser.role = 'user';
-          }
+          // Ensure user has a valid role
+          parsedUser.role = validateRole(parsedUser.role);
           setUser(parsedUser);
         }
       }
@@ -107,10 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await api.login(email, password);
-      // Ensure user has a role property, default to 'user' if not present
-      if (!response.user.role) {
-        response.user.role = 'user';
-      }
+      // Ensure user has a valid role
+      response.user.role = validateRole(response.user.role);
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       setIsAuthenticated(true);
@@ -132,10 +132,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     try {
       const response = await api.register(userData);
-      // Ensure user has a role property, default to 'user' if not present
-      if (!response.user.role) {
-        response.user.role = 'user';
-      }
+      // Ensure user has a valid role
+      response.user.role = validateRole(response.user.role);
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       setIsAuthenticated(true);
