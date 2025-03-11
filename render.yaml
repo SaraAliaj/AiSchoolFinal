@@ -34,11 +34,6 @@ services:
         value: production
       - key: PORT
         value: 3000
-      - key: DATABASE_URL
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: connectionString
       - key: DB_HOST
         fromService:
           name: quiz-database
@@ -70,11 +65,6 @@ services:
         value: 8000
       - key: ENV
         value: production
-      - key: DATABASE_URL
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: connectionString
       - key: DB_HOST
         fromService:
           name: quiz-database
