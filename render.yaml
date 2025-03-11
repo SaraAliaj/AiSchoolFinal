@@ -24,7 +24,7 @@ services:
   - type: web
     name: quiz-node-backend
     env: node
-    plan: free
+    plan: starter
     buildCommand: cd backend/node && npm install
     startCommand: cd backend/node && npm start
     healthCheckPath: /health
@@ -55,7 +55,7 @@ services:
   - type: web
     name: quiz-python-backend
     env: python
-    plan: free
+    plan: starter
     buildCommand: cd backend/python && pip install -r requirements.txt
     startCommand: cd backend/python && python main.py
     healthCheckPath: /health
@@ -90,7 +90,7 @@ services:
   - type: web
     name: quiz-frontend
     env: static
-    plan: free
+    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
