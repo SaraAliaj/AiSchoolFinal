@@ -55,7 +55,7 @@ services:
     name: quiz-python-backend
     env: python
     buildCommand: cd backend/python && pip install -r requirements.txt
-    startCommand: cd backend/python && python app.py
+    startCommand: cd backend/python && uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     autoDeploy: true
     envVars:

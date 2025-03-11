@@ -2,6 +2,12 @@ import os
 import json
 from typing import Dict, Any
 
+def getLessonContent(lesson_id: str) -> Dict[str, Any]:
+    """
+    Get lesson content for a given lesson ID
+    """
+    return process_pdf(lesson_id)
+
 def process_pdf(lesson_id: str) -> Dict[str, Any]:
     """
     Process a PDF file and return its content

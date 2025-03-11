@@ -10,7 +10,7 @@ load_dotenv()
 
 # Import the PDF integration
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-import pdf_integration
+import pdf_processor
 
 async def handle_client(websocket):
     try:
@@ -42,7 +42,7 @@ async def process_message(data):
         
         # Get lesson content using the PDF integration
         try:
-            lesson_data = await asyncio.to_thread(pdf_integration.getLessonContent, lesson_id)
+            lesson_data = await asyncio.to_thread(pdf_processor.getLessonContent, lesson_id)
             
             # Check if we have QA pairs to match against
             if lesson_data.get('qaPairs') and len(lesson_data['qaPairs']) > 0:
