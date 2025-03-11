@@ -43,20 +43,19 @@ axiosInstance.interceptors.response.use(
 const api = {
   login: async (email: string, password: string) => {
     try {
-      const response = await axiosInstance.post('/auth/login', { email, password });
-      const data = response.data;
-      
-      // Ensure user object exists and has required properties
-      if (!data.user || typeof data.user !== 'object') {
-        throw new Error('Invalid response format: missing user object');
+      // First try with the /api prefix (which is added by baseURL)
+      try {
+        const response = await axiosInstance.post('/auth/login', { email, password });
+        return response.data;
+      } catch (error: any) {
+        if (error.response && error.response.status === 404) {
+          // If 404, try without the /api prefix
+          console.log('Retrying login without /api prefix...');
+          const directResponse = await axios.post('http://localhost:3000/api/auth/login', { email, password });
+          return directResponse.data;
+        }
+        throw error;
       }
-      
-      // Ensure role is set
-      if (!data.user.role) {
-        data.user.role = 'student';
-      }
-      
-      return data;
     } catch (error: any) {
       console.error('Login API error:', {
         status: error.response?.status,
@@ -69,21 +68,20 @@ const api = {
 
   register: async (userData: { username: string, surname: string, email: string, password: string }) => {
     try {
-      console.log('Sending registration request to:', `/auth/register`);
-      const response = await axiosInstance.post('/auth/register', userData);
-      const data = response.data;
-      
-      // Ensure user object exists and has required properties
-      if (!data.user || typeof data.user !== 'object') {
-        throw new Error('Invalid response format: missing user object');
+      // First try with the /api prefix (which is added by baseURL)
+      try {
+        console.log('Sending registration request to:', `/auth/register`);
+        const response = await axiosInstance.post('/auth/register', userData);
+        return response.data;
+      } catch (error: any) {
+        if (error.response && error.response.status === 404) {
+          // If 404, try without the /api prefix
+          console.log('Retrying registration without /api prefix...');
+          const directResponse = await axios.post('http://localhost:3000/api/auth/register', userData);
+          return directResponse.data;
+        }
+        throw error;
       }
-      
-      // Ensure role is set
-      if (!data.user.role) {
-        data.user.role = 'student';
-      }
-      
-      return data;
     } catch (error: any) {
       console.error('Registration API error:', {
         status: error.response?.status,

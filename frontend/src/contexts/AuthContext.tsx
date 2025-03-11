@@ -112,17 +112,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await api.login(email, password);
-      if (!response.user || typeof response.user !== 'object') {
-        throw new Error('Invalid response format: missing user object');
-      }
       
-      // Ensure user has a valid role
-      response.user.role = validateRole(response.user.role);
+      // Create a properly formatted user object from the response
+      const userObj: User = {
+        id: response.user?.id || response.userId || '0',
+        username: response.user?.username || email.split('@')[0],
+        email: response.user?.email || email,
+        role: validateRole(response.user?.role)
+      };
       
       localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('user', JSON.stringify(userObj));
       setIsAuthenticated(true);
-      setUser(response.user);
+      setUser(userObj);
     } catch (error) {
       console.error('Login failed:', {
         message: error.message,
@@ -140,17 +142,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     try {
       const response = await api.register(userData);
-      if (!response.user || typeof response.user !== 'object') {
-        throw new Error('Invalid response format: missing user object');
-      }
       
-      // Ensure user has a valid role
-      response.user.role = validateRole(response.user.role);
+      // Create a properly formatted user object from the response
+      const userObj: User = {
+        id: response.user?.id || response.userId || '0',
+        username: response.user?.username || userData.username,
+        email: response.user?.email || userData.email,
+        role: validateRole(response.user?.role)
+      };
       
       localStorage.setItem('authToken', response.token);
-      localStorage.setItem('user', JSON.stringify(response.user));
+      localStorage.setItem('user', JSON.stringify(userObj));
       setIsAuthenticated(true);
-      setUser(response.user);
+      setUser(userObj);
     } catch (error) {
       console.error('Registration failed:', error);
       throw error;
