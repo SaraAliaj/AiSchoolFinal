@@ -1,0 +1,137 @@
+services:
+  # MySQL Database
+  - type: pserv
+    name: quiz-database
+    env: docker
+    plan: starter
+    disk:
+      name: data
+      mountPath: /var/lib/mysql
+      sizeGB: 10
+    envVars:
+      - key: MYSQL_ROOT_PASSWORD
+        sync: false
+      - key: MYSQL_DATABASE
+        value: aischool
+      - key: MYSQL_USER
+        sync: false
+      - key: MYSQL_PASSWORD
+        sync: false
+    dockerContext: .
+    dockerfilePath: ./Dockerfile.mysql
+    healthCheckPath: /
+    healthCheckTimeout: 300
+
+  # Node.js Backend service
+  - type: web
+    name: quiz-node-backend
+    env: node
+    plan: starter
+    runtime: node
+    nodeVersion: 18.x
+    buildCommand: cd backend/node && npm install
+    startCommand: cd backend/node && npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_HOST
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: host
+      - key: DB_USER
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: user
+      - key: DB_PASSWORD
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: password
+      - key: DB_NAME
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: database
+
+  # Python Backend service
+  - type: web
+    name: quiz-python-backend
+    env: python
+    plan: starter
+    buildCommand: cd backend/python && pip install -r requirements.txt
+    startCommand: cd backend/python && python main.py
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.9.0
+      - key: PORT
+        value: 8000
+      - key: ENV
+        value: production
+      - key: DB_HOST
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: host
+      - key: DB_USER
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: user
+      - key: DB_PASSWORD
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: password
+      - key: DB_NAME
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: database
+      - key: XAI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"
+
+  # Frontend static site
+  - type: web
+    name: quiz-frontend
+    env: static
+    plan: starter
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: no-cache
+    envVars:
+      - key: VITE_NODE_API_URL
+        fromService:
+          name: quiz-node-backend
+          type: web
+          property: url
+      - key: VITE_PYTHON_API_URL
+        fromService:
+          name: quiz-python-backend
+          type: web
+          property: url
+      - key: VITE_WS_URL
+        fromService:
+          name: quiz-python-backend
+          type: web
+          property: url
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html 

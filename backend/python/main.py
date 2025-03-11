@@ -9,26 +9,28 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import string
 import re
+from config import Config
 
 # Load environment variables from .env file
 load_dotenv()
 
-# Get API key from environment variables
-XAI_API_KEY = os.getenv("XAI_API_KEY")
-if not XAI_API_KEY:
-    print("Warning: XAI_API_KEY environment variable not set. Some features will be limited.")
+# Initialize FastAPI app
+app = FastAPI()
 
-# Database configuration
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_USER = os.getenv("DB_USER", "Sara")
-DB_PASSWORD = os.getenv("DB_PASSWORD", "Sara0330!!")
-DB_NAME = os.getenv("DB_NAME", "aischool")
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=Config.CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Initialize OpenAI client if API key is available
 try:
-    if XAI_API_KEY:
+    if Config.XAI_API_KEY:
         client = OpenAI(
-            api_key=XAI_API_KEY,
+            api_key=Config.XAI_API_KEY,
             base_url="https://api.x.ai/v1",
         )
         print("Grok API client initialized successfully")
@@ -38,18 +40,6 @@ try:
 except Exception as e:
     print(f"Error initializing API client: {e}")
     client = None
-
-# Initialize FastAPI app
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 # Keep track of connected WebSockets
 active_connections = {}
@@ -89,16 +79,16 @@ def get_db_connection():
     """Create and return a database connection"""
     try:
         connection = pymysql.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME,
+            host=Config.DB_HOST,
+            user=Config.DB_USER,
+            password=Config.DB_PASSWORD,
+            database=Config.DB_NAME,
             cursorclass=pymysql.cursors.DictCursor
         )
         return connection
     except Exception as e:
         print(f"Database connection error: {e}")
-        return None
+        raise HTTPException(status_code=500, detail="Database connection error")
 
 def get_lesson_info(lesson_id):
     """Get lesson information from the database"""
@@ -432,5 +422,6 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting server on port 3007...")
-    uvicorn.run(app, host="0.0.0.0", port=3007) 
+    port = Config.PORT
+    print(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port) 
