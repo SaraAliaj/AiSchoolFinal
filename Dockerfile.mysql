@@ -1,14 +1,15 @@
 FROM mysql:8.0
 
-# Copy custom MySQL configuration if needed
+# Copy custom MySQL configuration
 COPY mysql.cnf /etc/mysql/conf.d/
 
-# Create a directory for the sanitized SQL file
-RUN mkdir -p /docker-entrypoint-initdb.d
+# Create directories
+RUN mkdir -p /docker-entrypoint-initdb.d /var/lib/mysql-files
 
 # Copy and sanitize the init.sql file
 COPY init.sql /tmp/init.sql
-RUN tr -cd '\11\12\15\40-\176' < /tmp/init.sql > /docker-entrypoint-initdb.d/init.sql && \
+RUN sed -i 's/\r//g' /tmp/init.sql && \
+    iconv -f utf8 -t utf8 -c /tmp/init.sql > /docker-entrypoint-initdb.d/init.sql && \
     rm /tmp/init.sql
 
 # Set environment variables
@@ -17,8 +18,12 @@ ENV MYSQL_DATABASE=${MYSQL_DATABASE}
 ENV MYSQL_USER=${MYSQL_USER}
 ENV MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
+# Set proper permissions
+RUN chown -R mysql:mysql /docker-entrypoint-initdb.d /var/lib/mysql-files && \
+    chmod 644 /docker-entrypoint-initdb.d/init.sql
+
 # Expose MySQL port
 EXPOSE 3306
 
-# Start MySQL server with binary mode enabled
-CMD ["mysqld", "--binary-mode=1"] 
+# Start MySQL server
+CMD ["mysqld"] 

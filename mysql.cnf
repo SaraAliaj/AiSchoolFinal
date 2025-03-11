@@ -1,8 +1,9 @@
 [mysqld]
 # Basic Settings
 max_connections = 100
-max_allowed_packet = 64M
+max_allowed_packet = 256M
 wait_timeout = 600
+net_buffer_length = 1000000
 
 # InnoDB Settings
 innodb_buffer_pool_size = 256M
@@ -12,9 +13,16 @@ innodb_flush_log_at_trx_commit = 2
 # Character Set
 character-set-server = utf8mb4
 collation-server = utf8mb4_unicode_ci
+skip-character-set-client-handshake
 
 # Logging
 general_log = 0
 slow_query_log = 1
 slow_query_log_file = /var/log/mysql/mysql-slow.log
-long_query_time = 2 
+long_query_time = 2
+
+[mysql]
+default-character-set = utf8mb4
+
+[client]
+default-character-set = utf8mb4 
