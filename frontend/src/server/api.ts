@@ -44,7 +44,19 @@ const api = {
   login: async (email: string, password: string) => {
     try {
       const response = await axiosInstance.post('/auth/login', { email, password });
-      return response.data;
+      const data = response.data;
+      
+      // Ensure user object exists and has required properties
+      if (!data.user || typeof data.user !== 'object') {
+        throw new Error('Invalid response format: missing user object');
+      }
+      
+      // Ensure role is set
+      if (!data.user.role) {
+        data.user.role = 'student';
+      }
+      
+      return data;
     } catch (error: any) {
       console.error('Login API error:', {
         status: error.response?.status,
@@ -59,7 +71,19 @@ const api = {
     try {
       console.log('Sending registration request to:', `/auth/register`);
       const response = await axiosInstance.post('/auth/register', userData);
-      return response.data;
+      const data = response.data;
+      
+      // Ensure user object exists and has required properties
+      if (!data.user || typeof data.user !== 'object') {
+        throw new Error('Invalid response format: missing user object');
+      }
+      
+      // Ensure role is set
+      if (!data.user.role) {
+        data.user.role = 'student';
+      }
+      
+      return data;
     } catch (error: any) {
       console.error('Registration API error:', {
         status: error.response?.status,

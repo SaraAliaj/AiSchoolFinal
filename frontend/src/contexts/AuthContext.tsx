@@ -28,10 +28,14 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 // Helper function to validate and normalize role
 const validateRole = (role?: string): 'student' | 'lead_student' | 'admin' => {
-  if (!role || !['student', 'lead_student', 'admin'].includes(role.toLowerCase())) {
+  if (!role || typeof role !== 'string') {
     return 'student';
   }
-  return role.toLowerCase() as 'student' | 'lead_student' | 'admin';
+  const normalizedRole = role.toLowerCase();
+  if (!['student', 'lead_student', 'admin'].includes(normalizedRole)) {
+    return 'student';
+  }
+  return normalizedRole as 'student' | 'lead_student' | 'admin';
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -66,7 +70,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Token verification failed:', error);
       // Don't clear token on network errors to allow offline access
-      // Instead, trust the cached token
       const userData = localStorage.getItem('user');
       if (userData) {
         const parsedUser = JSON.parse(userData);
@@ -109,8 +112,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       const response = await api.login(email, password);
+      if (!response.user || typeof response.user !== 'object') {
+        throw new Error('Invalid response format: missing user object');
+      }
+      
       // Ensure user has a valid role
       response.user.role = validateRole(response.user.role);
+      
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       setIsAuthenticated(true);
@@ -132,8 +140,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }) => {
     try {
       const response = await api.register(userData);
+      if (!response.user || typeof response.user !== 'object') {
+        throw new Error('Invalid response format: missing user object');
+      }
+      
       // Ensure user has a valid role
       response.user.role = validateRole(response.user.role);
+      
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(response.user));
       setIsAuthenticated(true);
