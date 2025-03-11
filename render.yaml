@@ -25,7 +25,7 @@ services:
     name: quiz-node-backend
     env: node
     buildCommand: cd backend/node && npm install
-    startCommand: cd backend/node && npm start
+    startCommand: cd backend/node && npm run init-db && npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -49,6 +49,8 @@ services:
         sync: false
       - key: DB_NAME
         value: aischool
+      - key: JWT_SECRET
+        generateValue: true
 
   # Python Backend service
   - type: web
