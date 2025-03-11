@@ -1,16 +1,19 @@
 interface Config {
-    apiUrl: string;
+    nodeApiUrl: string;
+    pythonApiUrl: string;
     wsUrl: string;
 }
 
 const development: Config = {
-    apiUrl: 'http://localhost:8000',
+    nodeApiUrl: 'http://localhost:3000',
+    pythonApiUrl: 'http://localhost:8000',
     wsUrl: 'ws://localhost:8000'
 };
 
 const production: Config = {
-    apiUrl: import.meta.env.VITE_API_URL || 'https://your-backend-app.onrender.com',
-    wsUrl: import.meta.env.VITE_WS_URL || 'wss://your-backend-app.onrender.com'
+    nodeApiUrl: `https://${import.meta.env.VITE_NODE_API_URL}:${import.meta.env.VITE_NODE_API_PORT}`,
+    pythonApiUrl: `https://${import.meta.env.VITE_PYTHON_API_URL}:${import.meta.env.VITE_PYTHON_API_PORT}`,
+    wsUrl: `wss://${import.meta.env.VITE_WS_URL}:${import.meta.env.VITE_WS_PORT}`
 };
 
 const config: Config = import.meta.env.PROD ? production : development;

@@ -19,7 +19,6 @@ services:
         sync: false
     dockerContext: .
     dockerfilePath: ./Dockerfile.mysql
-    healthCheckPath: /
 
   # Node.js Backend service
   - type: web
@@ -35,26 +34,27 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: DATABASE_URL
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: connectionString
       - key: DB_HOST
         fromService:
           name: quiz-database
           type: pserv
           property: host
+      - key: DB_PORT
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: port
       - key: DB_USER
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: user
+        sync: false
       - key: DB_PASSWORD
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: password
+        sync: false
       - key: DB_NAME
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: database
+        value: aischool
 
   # Python Backend service
   - type: web
@@ -70,26 +70,27 @@ services:
         value: 8000
       - key: ENV
         value: production
+      - key: DATABASE_URL
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: connectionString
       - key: DB_HOST
         fromService:
           name: quiz-database
           type: pserv
           property: host
+      - key: DB_PORT
+        fromService:
+          name: quiz-database
+          type: pserv
+          property: port
       - key: DB_USER
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: user
+        sync: false
       - key: DB_PASSWORD
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: password
+        sync: false
       - key: DB_NAME
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: database
+        value: aischool
       - key: XAI_API_KEY
         sync: false
       - key: OPENAI_API_KEY
@@ -107,17 +108,32 @@ services:
         fromService:
           name: quiz-node-backend
           type: web
-          property: url
+          property: host
+      - key: VITE_NODE_API_PORT
+        fromService:
+          name: quiz-node-backend
+          type: web
+          property: port
       - key: VITE_PYTHON_API_URL
         fromService:
           name: quiz-python-backend
           type: web
-          property: url
+          property: host
+      - key: VITE_PYTHON_API_PORT
+        fromService:
+          name: quiz-python-backend
+          type: web
+          property: port
       - key: VITE_WS_URL
         fromService:
           name: quiz-python-backend
           type: web
-          property: url
+          property: host
+      - key: VITE_WS_PORT
+        fromService:
+          name: quiz-python-backend
+          type: web
+          property: port
     routes:
       - type: rewrite
         source: /*

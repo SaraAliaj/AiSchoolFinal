@@ -405,20 +405,7 @@ async def websocket_endpoint(websocket: WebSocket):
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    # Check database connection
-    connection = get_db_connection()
-    db_status = "connected" if connection else "disconnected"
-    if connection:
-        connection.close()
-    
-    # Check Grok API status
-    api_status = "available" if client else "unavailable"
-    
-    return {
-        "status": "ok",
-        "database": db_status,
-        "grok_api": api_status
-    }
+    return {"status": "healthy"}
 
 if __name__ == "__main__":
     import uvicorn
