@@ -3,24 +3,22 @@ FROM mysql:8.0
 # Copy custom MySQL configuration
 COPY mysql.cnf /etc/mysql/conf.d/
 
-# Create directories
+# Create necessary directories
 RUN mkdir -p /docker-entrypoint-initdb.d /var/lib/mysql-files
 
-# Copy and sanitize the init.sql file
-COPY init.sql /tmp/init.sql
-RUN sed -i 's/\r//g' /tmp/init.sql && \
-    iconv -f utf8 -t utf8 -c /tmp/init.sql > /docker-entrypoint-initdb.d/init.sql && \
-    rm /tmp/init.sql
+# Copy and prepare the init.sql file
+COPY init.sql /docker-entrypoint-initdb.d/
+RUN chmod 644 /docker-entrypoint-initdb.d/init.sql && \
+    sed -i 's/\r//g' /docker-entrypoint-initdb.d/init.sql
 
 # Set environment variables
 ENV MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-ENV MYSQL_DATABASE=${MYSQL_DATABASE}
+ENV MYSQL_DATABASE=aischool
 ENV MYSQL_USER=${MYSQL_USER}
 ENV MYSQL_PASSWORD=${MYSQL_PASSWORD}
 
 # Set proper permissions
-RUN chown -R mysql:mysql /docker-entrypoint-initdb.d /var/lib/mysql-files && \
-    chmod 644 /docker-entrypoint-initdb.d/init.sql
+RUN chown -R mysql:mysql /docker-entrypoint-initdb.d /var/lib/mysql-files
 
 # Expose MySQL port
 EXPOSE 3306
