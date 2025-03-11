@@ -246,6 +246,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const user = rows[0];
+    console.log('Found user:', { ...user, password: '[REDACTED]' });
+
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
@@ -265,38 +267,37 @@ app.post('/api/auth/login', async (req, res) => {
       { expiresIn: '24h' }
     );
 
-    // Emit socket event for online status update
-    console.log('Emitting user_status_change event for user:', user.id);
-    io.emit('user_status_change', { 
-      userId: user.id, 
-      username: user.username,
-      surname: user.surname,
-      active: true 
-    });
+    // Handle both old and new table structures
+    const username = user.username || (user.name ? user.name.split(' ')[0] : 'User');
+    const surname = user.surname || (user.name ? user.name.split(' ').slice(1).join(' ') : '');
 
-    // Map the role to one of the valid values
-    let validRole = 'student';
-    if (user.role) {
-      const role = user.role.toLowerCase();
-      if (['student', 'lead_student', 'admin'].includes(role)) {
-        validRole = role;
-      }
-    }
+    // Ensure role is one of the valid values
+    const validRole = ['student', 'lead_student', 'admin'].includes(user.role?.toLowerCase()) 
+      ? user.role.toLowerCase() 
+      : 'student';
 
     console.log('User logged in successfully:', {
       id: user.id,
-      username: user.username,
+      username,
       email: user.email,
       role: validRole
+    });
+
+    // Emit socket event for online status update
+    io.emit('user_status_change', { 
+      userId: user.id, 
+      username,
+      surname,
+      active: true 
     });
 
     res.json({
       token,
       user: {
         id: user.id,
-        username: user.username,
+        username,
         email: user.email,
-        surname: user.surname,
+        surname,
         role: validRole,
         active: true
       }
