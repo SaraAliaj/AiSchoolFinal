@@ -51,6 +51,8 @@ services:
         value: aischool
       - key: JWT_SECRET
         generateValue: true
+      - key: FRONTEND_URL
+        value: https://quiz-frontend.onrender.com
 
   # Python Backend service
   - type: web
@@ -85,6 +87,8 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: FRONTEND_URL
+        value: https://quiz-frontend.onrender.com
 
   # Frontend static site
   - type: web

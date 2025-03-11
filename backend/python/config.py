@@ -18,11 +18,16 @@ class Config:
     XAI_API_KEY = os.getenv("XAI_API_KEY")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
     
+    # Frontend URL
+    FRONTEND_URL = os.getenv("FRONTEND_URL", "https://quiz-frontend.onrender.com")
+    
     # CORS Settings
     CORS_ORIGINS = [
-        "https://your-frontend-app.onrender.com",  # Update this with your frontend URL
+        FRONTEND_URL,
         "http://localhost:5173",
-        "http://127.0.0.1:5173"
+        "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174"
     ]
 
     @classmethod

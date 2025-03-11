@@ -13,9 +13,15 @@ import { createServer } from 'http';
 
 const app = express();
 const httpServer = createServer(app);
+
+// Get the frontend URL from environment variable or use a default
+const FRONTEND_URL = process.env.FRONTEND_URL || 'https://quiz-frontend.onrender.com';
+console.log('Frontend URL:', FRONTEND_URL);
+
 const io = new Server(httpServer, {
   cors: {
     origin: [
+      FRONTEND_URL,
       'http://localhost:5173',
       'http://localhost:5174',
       'http://127.0.0.1:5173',
@@ -30,7 +36,11 @@ const io = new Server(httpServer, {
 
 // Configure CORS
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://localhost:5174'],
+  origin: [
+    FRONTEND_URL,
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -1191,6 +1201,7 @@ const startServer = async () => {
     // Update CORS settings with the new port
     app.use(cors({
       origin: [
+        FRONTEND_URL,
         'http://localhost:5173',
         'http://localhost:5174',
         'http://127.0.0.1:5173',
@@ -1207,6 +1218,7 @@ const startServer = async () => {
     io.attach(httpServer, {
       cors: {
         origin: [
+          FRONTEND_URL,
           'http://localhost:5173',
           'http://localhost:5174',
           'http://127.0.0.1:5173',
