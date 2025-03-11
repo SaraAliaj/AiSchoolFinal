@@ -34,15 +34,9 @@ services:
       - key: PORT
         value: 3000
       - key: DB_HOST
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: host
+        value: quiz-database-8ags
       - key: DB_PORT
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: port
+        value: 3306
       - key: DB_USER
         sync: false
       - key: DB_PASSWORD
@@ -68,15 +62,9 @@ services:
       - key: ENV
         value: production
       - key: DB_HOST
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: host
+        value: quiz-database-8ags
       - key: DB_PORT
-        fromService:
-          name: quiz-database
-          type: pserv
-          property: port
+        value: 3306
       - key: DB_USER
         sync: false
       - key: DB_PASSWORD
@@ -98,35 +86,11 @@ services:
     staticPublishPath: ./frontend/dist
     envVars:
       - key: VITE_NODE_API_URL
-        fromService:
-          name: quiz-node-backend
-          type: web
-          property: host
-      - key: VITE_NODE_API_PORT
-        fromService:
-          name: quiz-node-backend
-          type: web
-          property: port
+        value: https://quiz-node-backend.onrender.com
       - key: VITE_PYTHON_API_URL
-        fromService:
-          name: quiz-python-backend
-          type: web
-          property: host
-      - key: VITE_PYTHON_API_PORT
-        fromService:
-          name: quiz-python-backend
-          type: web
-          property: port
+        value: https://quiz-python-backend.onrender.com
       - key: VITE_WS_URL
-        fromService:
-          name: quiz-python-backend
-          type: web
-          property: host
-      - key: VITE_WS_PORT
-        fromService:
-          name: quiz-python-backend
-          type: web
-          property: port
+        value: wss://quiz-node-backend.onrender.com
     routes:
       - type: rewrite
         source: /*

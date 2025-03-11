@@ -24,6 +24,9 @@ class Config:
     # CORS Settings
     CORS_ORIGINS = [
         FRONTEND_URL,
+        "https://quiz-frontend.onrender.com",
+        "https://quiz-node-backend.onrender.com",
+        "https://quiz-python-backend.onrender.com",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "http://localhost:5174",
