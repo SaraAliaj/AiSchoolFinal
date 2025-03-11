@@ -3,8 +3,9 @@ CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    role ENUM('student', 'teacher', 'admin') DEFAULT 'student',
+    username VARCHAR(255) NOT NULL,
+    surname VARCHAR(255) NOT NULL,
+    role ENUM('student', 'lead_student', 'admin') DEFAULT 'student',
     active BOOLEAN DEFAULT FALSE,
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -53,6 +54,6 @@ CREATE TABLE IF NOT EXISTS lessons (
 );
 
 -- Insert default admin user
-INSERT INTO users (email, password, name, role) 
-VALUES ('admin@example.com', '$2b$10$YourHashedPasswordHere', 'Admin User', 'admin')
+INSERT INTO users (email, password, username, surname, role) 
+VALUES ('admin@example.com', '$2b$10$YourHashedPasswordHere', 'Admin', 'User', 'admin')
 ON DUPLICATE KEY UPDATE role = 'admin'; 

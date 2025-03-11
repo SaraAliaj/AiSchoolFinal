@@ -274,6 +274,9 @@ app.post('/api/auth/login', async (req, res) => {
       active: true 
     });
 
+    // Ensure role is one of the valid values
+    const validRole = ['student', 'lead_student', 'admin'].includes(user.role) ? user.role : 'student';
+
     res.json({
       token,
       user: {
@@ -281,7 +284,7 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         email: user.email,
         surname: user.surname,
-        role: user.role || 'user', // Add role to the response
+        role: validRole,
         active: true
       }
     });
