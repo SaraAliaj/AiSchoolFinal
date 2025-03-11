@@ -3,7 +3,7 @@ services:
   - type: pserv
     name: quiz-database
     env: docker
-    plan: starter
+
     disk:
       name: data
       mountPath: /var/lib/mysql
@@ -24,7 +24,6 @@ services:
   - type: web
     name: quiz-node-backend
     env: node
-    plan: starter
     buildCommand: cd backend/node && npm install
     startCommand: cd backend/node && npm start
     healthCheckPath: /health
@@ -55,7 +54,6 @@ services:
   - type: web
     name: quiz-python-backend
     env: python
-    plan: starter
     buildCommand: cd backend/python && pip install -r requirements.txt
     startCommand: cd backend/python && python main.py
     healthCheckPath: /health
@@ -90,7 +88,6 @@ services:
   - type: web
     name: quiz-frontend
     env: static
-    plan: starter
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
     envVars:
