@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate, Link } from 'react-router-dom';
 import './Sidebar.css';
 
 const Sidebar = () => {
     const [collapsed, setCollapsed] = useState(false);
     const [curriculumOpen, setCurriculumOpen] = useState(false);
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
     const toggleSidebar = () => {
         setCollapsed(!collapsed);
@@ -20,11 +22,28 @@ const Sidebar = () => {
         setCurriculumOpen(!curriculumOpen);
     };
 
+    const handleLogout = async () => {
+        try {
+            await logout();
+            navigate('/login');
+        } catch (error) {
+            console.error("Logout error:", error);
+        }
+    };
+
     return (
         <div className={`sidebar ${collapsed ? 'collapsed' : ''}`}>
             <button className="toggle-btn" onClick={toggleSidebar}>
                 {collapsed ? '→' : '←'}
             </button>
+            
+            {/* Logo and brand */}
+            <div className="logo-container">
+                <div className="brand-logo">
+                    <img src="/favicon.svg" alt="AI School" className="brain-icon" />
+                    {!collapsed && <span className="brand-name">AI School</span>}
+                </div>
+            </div>
             
             {/* User profile section */}
             <div className="user-profile">
@@ -50,10 +69,10 @@ const Sidebar = () => {
             
             <ul className="main-menu">
                 <li>
-                    <a href="#" className="menu-link">
+                    <Link to="/chat" className="menu-link">
                         <i className="icon-home"></i>
                         {!collapsed && <span>Home</span>}
-                    </a>
+                    </Link>
                 </li>
                 <li className={curriculumOpen ? 'active' : ''}>
                     <a href="#" className="menu-link" onClick={toggleCurriculum}>
@@ -84,11 +103,34 @@ const Sidebar = () => {
                         </ul>
                     )}
                 </li>
+                {user ? (
+                    <li>
+                        <a href="#" className="menu-link" onClick={handleLogout}>
+                            <i className="icon-logout"></i>
+                            {!collapsed && <span>Logout</span>}
+                        </a>
+                    </li>
+                ) : (
+                    <>
+                        <li>
+                            <Link to="/login" className="menu-link">
+                                <i className="icon-login"></i>
+                                {!collapsed && <span>Login</span>}
+                            </Link>
+                        </li>
+                        <li>
+                            <Link to="/register" className="menu-link">
+                                <i className="icon-register"></i>
+                                {!collapsed && <span>Register</span>}
+                            </Link>
+                        </li>
+                    </>
+                )}
                 <li>
-                    <a href="#" className="menu-link">
+                    <Link to="/settings" className="menu-link">
                         <i className="icon-settings"></i>
                         {!collapsed && <span>Settings</span>}
-                    </a>
+                    </Link>
                 </li>
             </ul>
         </div>

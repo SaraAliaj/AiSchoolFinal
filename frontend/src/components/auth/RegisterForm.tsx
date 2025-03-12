@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
+import { motion } from "framer-motion";
+import { User, Mail, Lock, UserCheck } from "lucide-react";
 
 export default function RegisterForm() {
   const [formData, setFormData] = useState({
@@ -100,89 +102,154 @@ export default function RegisterForm() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
-      <Card className="w-full max-w-md mx-4">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Create an Account</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="mb-4 p-2 text-red-500 bg-red-50 rounded text-sm">
-              {error}
-            </div>
-          )}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Input
-                  name="username"
-                  placeholder="Username"
-                  value={formData.username}
-                  onChange={handleChange}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-              <div className="space-y-2">
-                <Input
-                  name="surname"
-                  placeholder="Surname"
-                  value={formData.surname}
-                  onChange={handleChange}
-                  required
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Input
-                type="email"
-                name="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Input
-                type="password"
-                name="password"
-                placeholder="Password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Input
-                type="password"
-                name="confirmPassword"
-                placeholder="Confirm Password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <Button 
-              type="submit" 
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? "Signing up..." : "Sign Up"}
-            </Button>
-          </form>
-          <div className="mt-4 text-center text-sm">
-            Already have an account?{" "}
-            <Link to="/login" className="text-primary hover:underline">
-              Login
-            </Link>
+    <div className="flex flex-col items-center justify-center min-h-screen py-4 bg-[#f0f6ff]">
+      <div className="flex flex-col items-center w-full max-w-md mx-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex flex-col items-center mb-3"
+        >
+          <div className="flex items-center justify-center mb-1">
+            <img src="/favicon.svg" alt="AI School" className="h-10 w-10 text-[#333]" />
+            <h1 className="text-3xl font-bold ml-2 text-[#333]">AI School</h1>
           </div>
-        </CardContent>
-      </Card>
+          <p className="text-[#666] italic text-sm">Learn. Challenge. Grow.</p>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="w-full"
+        >
+          <Card className="shadow-lg border-0">
+            <CardHeader className="space-y-1 py-3">
+              <CardTitle className="text-xl text-center font-bold">Create Account</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {error && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="mb-3 p-2 text-red-500 bg-red-50 rounded-md text-sm"
+                >
+                  {error}
+                </motion.div>
+              )}
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1 relative">
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                        <User size={16} />
+                      </div>
+                      <Input
+                        name="username"
+                        placeholder="First name"
+                        value={formData.username}
+                        onChange={handleChange}
+                        required
+                        disabled={isLoading}
+                        className="h-10 pl-9 pr-4"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1 relative">
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                        <UserCheck size={16} />
+                      </div>
+                      <Input
+                        name="surname"
+                        placeholder="Last name"
+                        value={formData.surname}
+                        onChange={handleChange}
+                        required
+                        disabled={isLoading}
+                        className="h-10 pl-9 pr-4"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                      <Mail size={16} />
+                    </div>
+                    <Input
+                      type="email"
+                      name="email"
+                      placeholder="Email address"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      disabled={isLoading}
+                      className="h-10 pl-9 pr-4"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                      <Lock size={16} />
+                    </div>
+                    <Input
+                      type="password"
+                      name="password"
+                      placeholder="Password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      required
+                      disabled={isLoading}
+                      className="h-10 pl-9 pr-4"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
+                      <Lock size={16} />
+                    </div>
+                    <Input
+                      type="password"
+                      name="confirmPassword"
+                      placeholder="Confirm"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      required
+                      disabled={isLoading}
+                      className="h-10 pl-9 pr-4"
+                    />
+                  </div>
+                </div>
+                <Button 
+                  type="submit" 
+                  className="w-full h-10 bg-[#1f2937] hover:bg-[#374151] transition-colors" 
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing up..." : "Sign up"}
+                </Button>
+              </form>
+              <div className="mt-4 text-center text-sm">
+                Already have an account?{" "}
+                <Link to="/login" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                  Login
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5, delay: 0.4 }}
+          className="mt-4 text-xs text-gray-500"
+        >
+          © 2025 AI School. All rights reserved.
+        </motion.div>
+      </div>
     </div>
   );
 }
