@@ -96,9 +96,12 @@ export default function LessonChatbot({
       let connected = false;
       
       ws.onopen = () => {
-        connected = true;
-        console.log(`Connected to WebSocket server on port ${port}`);
-        socketRef.current = ws;
+        if (!connected) {
+          connected = true;
+          console.log(`Connected to WebSocket server on port ${port}`);
+          socketRef.current = ws;
+          // Don't send any initial message here
+        }
       };
       
       ws.onmessage = (event) => {
@@ -118,23 +121,27 @@ export default function LessonChatbot({
             return;
           }
           
-          // Add AI response to messages
-          const aiMessage: Message = {
-            id: Date.now().toString(),
-            content: jsonData.response || event.data,
-            sender: 'ai',
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, aiMessage]);
+          // Only add AI response if it's not a connection message
+          if (!jsonData.response?.includes("Connected to")) {
+            const aiMessage: Message = {
+              id: Date.now().toString(),
+              content: jsonData.response || event.data,
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          }
         } catch (e) {
-          // If not JSON, treat as plain text
-          const aiMessage: Message = {
-            id: Date.now().toString(),
-            content: event.data,
-            sender: 'ai',
-            timestamp: new Date()
-          };
-          setMessages(prev => [...prev, aiMessage]);
+          // If not JSON and not a connection message, treat as plain text
+          if (!event.data.includes("Connected to")) {
+            const aiMessage: Message = {
+              id: Date.now().toString(),
+              content: event.data,
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, aiMessage]);
+          }
         }
         setIsLoading(false);
       };
@@ -156,15 +163,16 @@ export default function LessonChatbot({
       
       ws.onclose = () => {
         console.log('WebSocket connection closed');
-        // Try to reconnect after 3 seconds
-        setTimeout(() => {
-          toast({
-            title: "Reconnecting",
-            description: "Attempting to reconnect to the server...",
-          });
-          // Retry connection to multiple ports
-          tryConnect([8080, 8081, 8082]);
-        }, 3000);
+        if (connected) {
+          // Only try to reconnect if we were previously connected
+          setTimeout(() => {
+            toast({
+              title: "Reconnecting",
+              description: "Attempting to reconnect to the server...",
+            });
+            tryConnect([8080, 8081, 8082]);
+          }, 3000);
+        }
       };
     };
     
@@ -331,10 +339,10 @@ export default function LessonChatbot({
   };
 
   return (
-    <div className="flex h-[calc(100vh-2rem)]">
+    <div className="flex h-screen gap-2 bg-slate-100 p-2">
       {/* PDF Viewer Section - 50% width */}
-      <div className="w-1/2 h-full p-4 border-r">
-        <div className="flex justify-between items-center mb-4">
+      <div className="w-1/2 h-[calc(100vh-1rem)] bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-4">
           <h2 className="text-xl font-bold flex items-center">
             <FileText className="mr-2 h-5 w-5 text-primary" />
             {lessonTitle}
@@ -352,32 +360,32 @@ export default function LessonChatbot({
         </div>
         
         {/* PDF Viewer Container */}
-        <div className="w-full h-[calc(100vh-8rem)] bg-white rounded-lg overflow-hidden border">
+        <div className="flex-1 w-full bg-slate-50">
           <embed
-            src={`${api.downloadLessonFile(lessonId)}#toolbar=0&navpanes=0&scrollbar=1&zoom=page-fit`}
+            src={`${api.downloadLessonFile(lessonId)}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
             type="application/pdf"
             className="w-full h-full"
+            style={{ display: 'block' }}
           />
         </div>
       </div>
 
       {/* Chat Section - 50% width */}
-      <div className="w-1/2 h-full flex flex-col bg-slate-50 border-l">
+      <div className="w-1/2 h-[calc(100vh-1rem)] flex flex-col bg-white rounded-lg shadow-lg overflow-hidden">
         {/* Chat header */}
-        <div className="px-4 py-3 border-b bg-white flex items-center shadow-sm">
+        <div className="px-6 py-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 flex items-center">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center shadow-inner">
+              <BrainCircuit className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800">AI Learning Assistant</h3>
-              <p className="text-xs text-slate-500">Connected to Lesson: {lessonTitle}</p>
+              <h3 className="font-semibold text-slate-800 text-lg">AI Learning Assistant</h3>
             </div>
           </div>
         </div>
         
-        {/* Messages area */}
-        <ScrollArea ref={scrollAreaRef} className="flex-grow px-4 py-6">
+        {/* Messages area - Adjust height to account for header and input area */}
+        <ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-6 bg-slate-50/50">
           <div className="space-y-6 max-w-[95%] mx-auto">
             {messages.map((message) => (
               <div
@@ -395,7 +403,7 @@ export default function LessonChatbot({
                   </Avatar>
                 ) : (
                   <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <Sparkles className="h-4 w-4 text-primary" />
+                    <BrainCircuit className="h-4 w-4 text-primary" />
                   </div>
                 )}
                 
@@ -421,7 +429,7 @@ export default function LessonChatbot({
             {isLoading && (
               <div className="flex items-start gap-3">
                 <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <Sparkles className="h-4 w-4 text-primary" />
+                  <BrainCircuit className="h-4 w-4 text-primary" />
                 </div>
                 
                 <div className="space-y-1 max-w-[80%]">
@@ -444,19 +452,19 @@ export default function LessonChatbot({
         </ScrollArea>
 
         {/* Input area */}
-        <div className="p-4 border-t bg-white shadow-sm">
-          <form onSubmit={handleSubmit} className="flex gap-2 items-center">
+        <div className="p-4 border-t bg-white shadow-lg">
+          <form onSubmit={handleSubmit} className="flex gap-3 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about this lesson..."
               disabled={isLoading}
-              className="flex-1 border-slate-300 focus-visible:ring-primary/70 bg-slate-50 py-6"
+              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-slate-50 py-6 rounded-xl shadow-inner"
             />
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-primary hover:bg-primary/90 transition-colors rounded-full h-10 w-10 p-0 flex items-center justify-center"
+              className="bg-primary hover:bg-primary/90 transition-colors rounded-full h-12 w-12 p-0 flex items-center justify-center shadow-lg"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
