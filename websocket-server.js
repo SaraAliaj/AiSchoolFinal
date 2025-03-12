@@ -11,9 +11,9 @@ const pdf = require('pdf-parse');
 // Database connection configuration
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'quiz_portal',
+    user: process.env.DB_USER || 'Sara',
+    password: process.env.DB_PASSWORD || 'Sara0330!!',
+    database: process.env.DB_NAME || 'aischool',
 };
 
 // Create a database connection pool
@@ -459,15 +459,15 @@ async function generateResponse(message) {
             // First, try to find relevant content from the lesson itself
             const relevantContent = findRelevantLessonContent(question, lessonContent);
             if (relevantContent) {
-                return `Based on the lesson materials:\n\n${relevantContent}`;
+                return removeMarkdownFormatting(`Based on the lesson materials:\n\n${relevantContent}`);
             }
             
             // Default response if no specific match is found and Grok API failed
-            return "I'm your AI assistant for this lesson. I encountered an issue processing your question with our AI service. Could you please try again with a more specific question about the lesson content?";
+            return removeMarkdownFormatting("I'm your AI assistant for this lesson. I encountered an issue processing your question with our AI service. Could you please try again with a more specific question about the lesson content?");
         }
     } catch (error) {
         console.error("Error in generateResponse:", error);
-        return "Sorry, I encountered an error while processing your question. Please try again.";
+        return removeMarkdownFormatting("Sorry, I encountered an error while processing your question. Please try again.");
     }
 }
 
@@ -562,7 +562,7 @@ ${lessonContext}`
             }
             
             console.log("Received response from API");
-            return grokAnswer;
+            return removeMarkdownFormatting(grokAnswer);
         } catch (apiError) {
             console.error("API request failed:", apiError.message);
             
@@ -581,7 +581,7 @@ ${lessonContext}`
                     });
                     
                     if (fallbackResponse.data && fallbackResponse.data.choices && fallbackResponse.data.choices.length > 0) {
-                        return fallbackResponse.data.choices[0].message.content;
+                        return removeMarkdownFormatting(fallbackResponse.data.choices[0].message.content);
                     }
                 } catch (fallbackError) {
                     console.error("Fallback API also failed:", fallbackError.message);
@@ -595,6 +595,23 @@ ${lessonContext}`
         console.error("Error in Grok API call:", error.message);
         throw error; // Re-throw to be handled by the calling function
     }
+}
+
+// Function to remove markdown formatting (like * for bold/italic)
+function removeMarkdownFormatting(text) {
+    if (!text) return text;
+    
+    // Remove asterisks used for bold and italic formatting
+    text = text.replace(/\*\*(.*?)\*\*/g, '$1'); // Remove ** (bold)
+    text = text.replace(/\*(.*?)\*/g, '$1');     // Remove * (italic)
+    
+    // Remove other markdown formatting if needed
+    // text = text.replace(/__(.*?)__/g, '$1');     // Remove __ (bold)
+    // text = text.replace(/_(.*?)_/g, '$1');       // Remove _ (italic)
+    // text = text.replace(/~~(.*?)~~/g, '$1');     // Remove ~~ (strikethrough)
+    
+    console.log("Removed markdown formatting from response");
+    return text;
 }
 
 // Initialize the database connection and start the server
