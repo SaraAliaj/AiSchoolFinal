@@ -10,6 +10,7 @@ import fs from 'fs';
 import pdfIntegration from './pdf_integration.js';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
+import ensureAdminRoles from './ensure-admin-roles.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -1191,6 +1192,9 @@ const startServer = async () => {
   try {
     await connectToDatabase();
     await ensureTablesExist();
+    
+    // Ensure admin roles are correctly set in database
+    await ensureAdminRoles();
     
     // Add this line to clean up online status on server start
     await cleanupOnlineStatus();
