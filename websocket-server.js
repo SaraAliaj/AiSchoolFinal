@@ -3,6 +3,8 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+// Load environment variables from .env file
+require('dotenv').config();
 // Add required database modules
 const mysql = require('mysql2/promise');
 // PDF extraction library
@@ -106,9 +108,9 @@ async function fetchLessonContent(lessonId) {
 
         console.log(`Fetching lesson ${lessonId} content from database...`);
         
-        // Query the database for the lesson
+        // Query the database for the lesson - removed 'description' column which doesn't exist
         const [lessons] = await dbPool.execute(
-            'SELECT id, title, description, pdf_path FROM lessons WHERE id = ? OR title LIKE ?',
+            'SELECT id, title, pdf_path FROM lessons WHERE id = ? OR title LIKE ?',
             [lessonId, `%${lessonId}%`]
         );
 
@@ -263,7 +265,7 @@ function parseContentIntoStructure(lesson, pdfContent) {
     return {
         id: lesson.id,
         title: lesson.title,
-        content: lesson.description || `This lesson covers ${lesson.title}.`,
+        content: `This lesson covers ${lesson.title}.`,
         topics: topics.length > 0 ? topics : ["Deep Learning", "Neural Networks", "Machine Learning"],
         sections: sections.length > 0 ? sections : [
             { 
@@ -474,15 +476,23 @@ async function generateResponse(message) {
 // Function to call the Grok API
 async function queryGrokAPI(question, lessonContext) {
     try {
-        console.log("Sending request to Grok API...");
+        console.log("Preparing to send request to Grok API...");
+        
+        // Check if we should use the fallback system instead of the API
+        if (process.env.USE_FALLBACK_SYSTEM === 'true') {
+            console.log("Fallback system enabled. Skipping API call and using local content matching.");
+            throw new Error("Fallback system enabled");
+        }
         
         // Get the API key and endpoint from environment variables or use defaults for testing
         const apiKey = process.env.GROK_API_KEY || process.env.XITTER_API_KEY;
-        const apiEndpoint = process.env.GROK_API_ENDPOINT || 'https://api.groq.com/openai/v1/chat/completions';
+        // Use the correct X.AI API endpoint as provided
+        const baseUrl = process.env.GROK_API_BASE_URL || "https://api.x.ai/v1";
+        const apiEndpoint = `${baseUrl}/chat/completions`;
         
-        if (!apiKey) {
-            console.log("No API key provided. Set GROK_API_KEY or XITTER_API_KEY environment variable.");
-            throw new Error("Missing API key for Grok");
+        if (!apiKey || apiKey === 'your_actual_api_key_here') {
+            console.log("No valid API key provided. Using fallback response system.");
+            throw new Error("Missing or invalid Grok API key");
         }
         
         console.log(`Using API endpoint: ${apiEndpoint}`);
@@ -505,9 +515,9 @@ async function queryGrokAPI(question, lessonContext) {
             }
         };
         
-        // Prepare the request payload - use LLaMA 2 model if Grok API isn't available
+        // Prepare the request payload with the correct model name
         const payload = {
-            model: "grok-beta", // Grok Beta model as specified
+            model: "grok-beta", // Confirmed grok-beta model as specified
             messages: [
                 {
                     role: "system",
@@ -528,7 +538,7 @@ ${lessonContext}`
             max_tokens: 1000 // Adjust as needed
         };
         
-        console.log("Sending request to API...");
+        console.log("Sending request to X.AI Grok API...");
         
         try {
             // Send the request to the Grok API
@@ -548,7 +558,7 @@ ${lessonContext}`
             let grokAnswer;
             
             if (response.data.choices && response.data.choices.length > 0) {
-                // Standard OpenAI format
+                // Standard OpenAI-compatible format
                 grokAnswer = response.data.choices[0].message.content;
             } else if (response.data.content) {
                 // Alternative format
@@ -561,7 +571,7 @@ ${lessonContext}`
                 throw new Error("Unexpected response format from API");
             }
             
-            console.log("Received response from API");
+            console.log("Received response from X.AI Grok API");
             return removeMarkdownFormatting(grokAnswer);
         } catch (apiError) {
             console.error("API request failed:", apiError.message);

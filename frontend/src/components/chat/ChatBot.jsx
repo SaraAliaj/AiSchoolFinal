@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Bot, User, Loader2 } from 'lucide-react';
+import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { api } from '@/server/api';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 // Get the WebSocket URL based on the current environment
 const getWebSocketUrl = () => {
@@ -18,7 +19,7 @@ const ChatBot = ({ lessonId }) => {
   const [messages, setMessages] = useState([
     {
       id: 'welcome',
-      text: `Hello! I'm your AI assistant for this lesson. How can I help you?`,
+      text: `Hi there! 🤖 Ready to chat?`,
       sender: 'bot',
       timestamp: new Date()
     }
@@ -273,19 +274,19 @@ const ChatBot = ({ lessonId }) => {
           className={`flex max-w-[80%] rounded-lg p-4 ${
             isBot
               ? 'bg-gray-100 text-gray-800'
-              : 'bg-blue-500 text-white'
+              : 'bg-primary text-white'
           } ${isError ? 'bg-red-100 border border-red-300 text-red-500' : ''}`}
         >
           <div className="flex-shrink-0 mr-3">
             {isBot ? (
-              <Bot className="h-5 w-5 text-blue-500" />
+              <Sparkles className="h-5 w-5 text-primary" />
             ) : (
               <User className="h-5 w-5 text-white" />
             )}
           </div>
           <div className="flex flex-col">
             <div className="whitespace-pre-wrap">{text}</div>
-            <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-blue-200'}`}>
+            <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-primary-foreground/80'}`}>
               {time}
             </div>
           </div>
@@ -341,12 +342,12 @@ const ChatBot = ({ lessonId }) => {
             value={inputValue}
             onChange={handleInputChange}
             placeholder="Type your message..."
-            className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
             disabled={isLoading || connectionStatus === 'error'}
           />
           <button
             type="submit"
-            className="bg-blue-500 text-white rounded-r-lg px-4 py-2 ml-0 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
+            className="bg-primary text-white rounded-r-lg px-4 py-2 ml-0 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-300 disabled:cursor-not-allowed"
             disabled={isLoading || !inputValue.trim() || connectionStatus === 'error'}
           >
             {isLoading ? (

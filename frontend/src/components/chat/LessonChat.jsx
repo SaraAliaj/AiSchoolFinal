@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import ChatBot from './ChatBot';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import SimplePDFViewer from '../curriculum/SimplePDFViewer';
 import { api } from '@/server/api';
 
@@ -38,7 +38,7 @@ const LessonChat = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <span className="ml-2">Loading lesson chat...</span>
       </div>
     );
@@ -71,8 +71,9 @@ const LessonChat = () => {
       <div className="w-1/2 h-full">
         <Card className="h-full border-0 rounded-none">
           <CardHeader className="border-b bg-muted/40">
-            <CardTitle>
-              {isDeepLearningLesson ? 'Deep Learning Assistant' : 'Lesson Chat'}
+            <CardTitle className="flex items-center">
+              <Sparkles className="h-5 w-5 mr-2 text-primary" />
+              {isDeepLearningLesson ? 'AI Learning Assistant' : 'Lesson Chat'}
               {lesson && <span className="text-sm text-muted-foreground ml-2">
                 - {lesson.title || `Week ${lesson.weekNumber}, ${lesson.dayOfWeek}`}
               </span>}

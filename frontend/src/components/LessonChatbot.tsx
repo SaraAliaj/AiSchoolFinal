@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, FileText, Loader2, BookOpen, MessageSquare, FileIcon, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Send, User, FileText, Loader2, BookOpen, MessageSquare, FileIcon, Download, ChevronLeft, ChevronRight, BrainCircuit, Clock, Sparkles } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -57,7 +57,7 @@ export default function LessonChatbot({
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: `Hello! I'm your AI assistant for the "${lessonTitle}" lesson. How can I help you?`,
+      content: `Hi there! 🤖 Ready to chat?`,
       sender: 'ai',
       timestamp: new Date()
     }
@@ -325,6 +325,11 @@ export default function LessonChatbot({
     );
   };
 
+  // Helper function to format time to hours and minutes only
+  const formatTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <div className="flex h-[calc(100vh-2rem)]">
       {/* PDF Viewer Section - 50% width */}
@@ -357,9 +362,23 @@ export default function LessonChatbot({
       </div>
 
       {/* Chat Section - 50% width */}
-      <div className="w-1/2 h-full flex flex-col">
-        <ScrollArea ref={scrollAreaRef} className="flex-grow p-4">
-          <div className="space-y-4">
+      <div className="w-1/2 h-full flex flex-col bg-slate-50 border-l">
+        {/* Chat header */}
+        <div className="px-4 py-3 border-b bg-white flex items-center shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
+              <Sparkles className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800">AI Learning Assistant</h3>
+              <p className="text-xs text-slate-500">Connected to Lesson: {lessonTitle}</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Messages area */}
+        <ScrollArea ref={scrollAreaRef} className="flex-grow px-4 py-6">
+          <div className="space-y-6 max-w-[95%] mx-auto">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -367,46 +386,83 @@ export default function LessonChatbot({
                   message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
-                <Avatar className={`h-8 w-8 ${message.sender === 'user' ? 'bg-primary' : 'bg-slate-200'}`}>
-                  <AvatarFallback className="text-xs">
-                    {message.sender === 'user' ? 
-                      <User className="h-4 w-4" /> : 
-                      <Bot className="h-4 w-4" />
-                    }
-                  </AvatarFallback>
-                </Avatar>
+                {message.sender === 'user' ? (
+                  <Avatar className="h-8 w-8 border border-primary/20">
+                    <AvatarFallback className="bg-secondary text-primary text-xs">
+                      {/* You can use initials or a custom icon here */}
+                      <User className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                ) : (
+                  <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4 text-primary" />
+                  </div>
+                )}
                 
-                <div className="space-y-1 max-w-[75%]">
+                <div className={`space-y-1 max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`rounded-lg px-4 py-2 ${
+                    className={`rounded-2xl px-4 py-2.5 shadow-sm ${
                       message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
+                        ? 'bg-primary text-primary-foreground rounded-tr-none'
+                        : 'bg-white border border-slate-200 rounded-tl-none'
                     }`}
                   >
-                    <p className="text-sm">{message.content}</p>
+                    <p className={`text-sm ${message.sender === 'ai' ? 'text-slate-800' : ''}`}>{message.content}</p>
                   </div>
-                  <p className="text-xs text-slate-500 px-2">
-                    {message.timestamp.toLocaleTimeString()}
+                  <p className="text-xs text-slate-500 px-2 flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    {formatTime(message.timestamp)}
                   </p>
                 </div>
               </div>
             ))}
+            
+            {/* Loading indicator when AI is preparing a response */}
+            {isLoading && (
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                </div>
+                
+                <div className="space-y-1 max-w-[80%]">
+                  <div className="rounded-2xl rounded-tl-none px-4 py-3 bg-white border border-slate-200 shadow-sm">
+                    <div className="flex items-center">
+                      <div className="flex space-x-1.5">
+                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '300ms' }}></div>
+                        <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '600ms' }}></div>
+                      </div>
+                      <span className="ml-3 text-sm text-slate-500">Thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
-        <div className="p-4 border-t bg-slate-50">
-          <form onSubmit={handleSubmit} className="flex gap-2">
+        {/* Input area */}
+        <div className="p-4 border-t bg-white shadow-sm">
+          <form onSubmit={handleSubmit} className="flex gap-2 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your message..."
+              placeholder="Ask about this lesson..."
               disabled={isLoading}
-              className="flex-1"
+              className="flex-1 border-slate-300 focus-visible:ring-primary/70 bg-slate-50 py-6"
             />
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="bg-primary hover:bg-primary/90 transition-colors rounded-full h-10 w-10 p-0 flex items-center justify-center"
+            >
+              {isLoading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <Send className="h-5 w-5" />
+              )}
             </Button>
           </form>
         </div>
