@@ -1,8 +1,19 @@
 import axios from 'axios';
 
-// Use relative URL since we're using Vite's proxy
+// Determine the backend URL based on the environment
+const getBaseUrl = () => {
+  const port = window.location.port || '80';
+  // If we're running on a dev server (usual ports: 5173, 3000, etc)
+  if (['5173', '5174', '3000', '3001'].includes(port)) {
+    return 'http://localhost:3000/api';
+  } 
+  // In production, assume the API is served from the same domain
+  return '/api';
+};
+
+// Use determined URL
 const axiosInstance = axios.create({
-  baseURL: '/api',  // Changed from absolute URL to relative
+  baseURL: getBaseUrl(),
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'
@@ -40,18 +51,23 @@ axiosInstance.interceptors.response.use(
   }
 );
 
+// Get the direct API URL for failover cases
+const getDirectApiUrl = () => {
+  return 'http://localhost:3000/api';
+};
+
 const api = {
   login: async (email: string, password: string) => {
     try {
-      // First try with the /api prefix (which is added by baseURL)
+      // First try with the configured baseURL
       try {
         const response = await axiosInstance.post('/auth/login', { email, password });
         return response.data;
       } catch (error: any) {
         if (error.response && error.response.status === 404) {
-          // If 404, try without the /api prefix
-          console.log('Retrying login without /api prefix...');
-          const directResponse = await axios.post('http://localhost:3000/api/auth/login', { email, password });
+          // If 404, try direct URL as fallback
+          console.log('Retrying login with direct URL...');
+          const directResponse = await axios.post(`${getDirectApiUrl()}/auth/login`, { email, password });
           return directResponse.data;
         }
         throw error;
@@ -68,16 +84,16 @@ const api = {
 
   register: async (userData: { username: string, surname: string, email: string, password: string }) => {
     try {
-      // First try with the /api prefix (which is added by baseURL)
+      // First try with the configured baseURL
       try {
         console.log('Sending registration request to:', `/auth/register`);
         const response = await axiosInstance.post('/auth/register', userData);
         return response.data;
       } catch (error: any) {
         if (error.response && error.response.status === 404) {
-          // If 404, try without the /api prefix
-          console.log('Retrying registration without /api prefix...');
-          const directResponse = await axios.post('http://localhost:3000/api/auth/register', userData);
+          // If 404, try direct URL as fallback
+          console.log('Retrying registration with direct URL...');
+          const directResponse = await axios.post(`${getDirectApiUrl()}/auth/register`, userData);
           return directResponse.data;
         }
         throw error;
@@ -353,5 +369,34 @@ const api = {
       throw error;
     }
   },
+
+  // Add a method for lesson-specific chat
+  sendLessonChatMessage: async (lessonId: string, message: string) => {
+    try {
+      console.log(`Sending chat message to lesson ${lessonId}:`, message);
+      const response = await axiosInstance.post(`/lessons/${lessonId}/chat`, {
+        message,
+        lessonId
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send chat message:', error);
+      throw error;
+    }
+  },
+  
+  // Add a general chat method
+  sendChatMessage: async (message: string) => {
+    try {
+      console.log('Sending general chat message:', message);
+      const response = await axiosInstance.post(`/chat`, {
+        message
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to send chat message:', error);
+      throw error;
+    }
+  }
 };
 export { api };

@@ -1,0 +1,10 @@
+{
+  "name": "websocket-server",
+  "version": "1.0.0",
+  "description": "WebSocket server for lesson chatbot",
+  "main": "websocket.js",
+  "type": "module",
+  "scripts": {
+    "start": "node websocket.js"
+  }
+} 

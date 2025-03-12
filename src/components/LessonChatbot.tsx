@@ -76,78 +76,106 @@ export default function LessonChatbot({
 
   // Initialize WebSocket connection
   useEffect(() => {
-    // Create WebSocket connection
-    const ws = new WebSocket('ws://localhost:3007/ws');
-    
-    ws.onopen = () => {
-      console.log('Connected to WebSocket server');
-    };
-    
-    ws.onmessage = (event) => {
-      console.log('Message from server:', event.data);
-      try {
-        // Try to parse the response as JSON
-        const jsonData = JSON.parse(event.data);
-        
-        // Check if there's an error
-        if (jsonData.error) {
+    // Try to connect to multiple possible ports
+    const tryConnect = (ports = [8080, 8081, 8082]) => {
+      if (ports.length === 0) {
+        toast({
+          title: "Connection Error",
+          description: "Failed to connect to any WebSocket server. Please ensure the server is running.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const port = ports[0];
+      console.log(`Trying to connect to WebSocket server on port ${port}...`);
+      
+      // Create WebSocket connection
+      const ws = new WebSocket(`ws://localhost:${port}`);
+      
+      let connected = false;
+      
+      ws.onopen = () => {
+        connected = true;
+        console.log(`Connected to WebSocket server on port ${port}`);
+        socketRef.current = ws;
+      };
+      
+      ws.onmessage = (event) => {
+        console.log('Message from server:', event.data);
+        try {
+          // Try to parse the response as JSON
+          const jsonData = JSON.parse(event.data);
+          
+          // Check if there's an error
+          if (jsonData.error) {
+            toast({
+              title: "Error",
+              description: jsonData.error,
+              variant: "destructive",
+            });
+            setIsLoading(false);
+            return;
+          }
+          
+          // Add AI response to messages
+          const aiMessage: Message = {
+            id: Date.now().toString(),
+            content: jsonData.response || event.data,
+            sender: 'ai',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, aiMessage]);
+        } catch (e) {
+          // If not JSON, treat as plain text
+          const aiMessage: Message = {
+            id: Date.now().toString(),
+            content: event.data,
+            sender: 'ai',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, aiMessage]);
+        }
+        setIsLoading(false);
+      };
+      
+      ws.onerror = (error) => {
+        console.error(`WebSocket error on port ${port}:`, error);
+        if (!connected) {
+          // If we couldn't connect, try the next port
+          tryConnect(ports.slice(1));
+        } else {
           toast({
-            title: "Error",
-            description: jsonData.error,
+            title: "Connection Error",
+            description: "WebSocket connection error. Please refresh the page.",
             variant: "destructive",
           });
           setIsLoading(false);
-          return;
         }
-        
-        // Add AI response to messages
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          content: jsonData.response || event.data,
-          sender: 'ai',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } catch (e) {
-        // If not JSON, treat as plain text
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          content: event.data,
-          sender: 'ai',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      }
-      setIsLoading(false);
+      };
+      
+      ws.onclose = () => {
+        console.log('WebSocket connection closed');
+        // Try to reconnect after 3 seconds
+        setTimeout(() => {
+          toast({
+            title: "Reconnecting",
+            description: "Attempting to reconnect to the server...",
+          });
+          // Retry connection to multiple ports
+          tryConnect([8080, 8081, 8082]);
+        }, 3000);
+      };
     };
     
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to lesson server. Please refresh the page.",
-        variant: "destructive",
-      });
-      setIsLoading(false);
-    };
-    
-    ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      // Try to reconnect after 3 seconds
-      setTimeout(() => {
-        toast({
-          title: "Reconnecting",
-          description: "Attempting to reconnect to the server...",
-        });
-        // The component will re-render and the useEffect will run again
-      }, 3000);
-    };
-    
-    socketRef.current = ws;
+    // Start connection attempts with all potential ports
+    tryConnect([8080, 8081, 8082]);
     
     // Clean up on unmount
     return () => {
-      ws.close();
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
     };
   }, []);
 

@@ -17,6 +17,7 @@ import QuizContent from "./pages/QuizContent";
 import Dashboard from '@/pages/Dashboard';
 import GroupChat from "@/pages/GroupChat";
 import Admin from "@/pages/Admin";
+import LessonChat from "@/components/chat/LessonChat";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="chat" element={<Chat />} />
               <Route path="group-chat" element={<GroupChat />} />
               <Route path="lessons" element={<Lessons />} />
+              <Route path="lessons/:lessonId/chat" element={<LessonChat />} />
               <Route path="challenges" element={<Challenges />} />
               <Route path="quizzes" element={<Quizzes />} />
               <Route path="quiz/:id" element={<QuizContent />} />

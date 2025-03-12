@@ -54,6 +54,16 @@ async def process_message(data):
                             'sender': 'bot',
                             'matched': True
                         }
+            # If lesson_data has qa_pairs instead of qaPairs (handle both formats)
+            elif lesson_data.get('qa_pairs') and len(lesson_data['qa_pairs']) > 0:
+                # Try to find a direct match in QA pairs
+                for qa_pair in lesson_data['qa_pairs']:
+                    if user_message.lower() in qa_pair['question'].lower():
+                        return {
+                            'message': qa_pair['answer'],
+                            'sender': 'bot',
+                            'matched': True
+                        }
             
             # If no direct match, construct a response based on lesson content
             title = lesson_data.get('title', 'Unknown Lesson')
@@ -85,8 +95,9 @@ async def process_message(data):
         }
 
 async def main():
-    server = await websockets.serve(handle_client, "localhost", 8765)
-    print("WebSocket server started on ws://localhost:8765")
+    # Use 0.0.0.0 to bind to all interfaces, allowing external connections
+    server = await websockets.serve(handle_client, "0.0.0.0", 8765)
+    print("WebSocket server started on ws://0.0.0.0:8765")
     await server.wait_closed()
 
 if __name__ == "__main__":

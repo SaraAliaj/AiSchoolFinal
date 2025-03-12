@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Circle, Loader2 } from "lucide-react";
+import { Loader2, Check, Circle, MessageSquare } from "lucide-react";
 import { api } from "@/server/api";
-import { LessonLayout } from "@/components/LessonLayout";
+import LessonLayout from "@/components/layout/LessonLayout";
+import { Button } from "@/components/ui/button";
 
 interface Module {
   title: string;
@@ -10,6 +12,7 @@ interface Module {
 }
 
 interface Lesson {
+  id?: string;
   title: string;
   modules: Module[];
   content?: string;
@@ -20,6 +23,7 @@ export default function Lessons() {
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -33,6 +37,7 @@ export default function Lessons() {
             return {
               title: `${course.name} - ${week.name}`,
               modules: week.lessons.map(lesson => ({
+                id: lesson.id,
                 title: lesson.name,
                 completed: false
               }))
@@ -55,6 +60,17 @@ export default function Lessons() {
 
   const handleLessonClick = (lesson: Lesson) => {
     setSelectedLesson(lesson);
+  };
+
+  const handleChatClick = (lessonId: string) => {
+    navigate(`/lessons/${lessonId}/chat`);
+  };
+
+  const isDeepLearningLesson = (title: string) => {
+    return (
+      title.toLowerCase().includes('deep learning') || 
+      (title.toLowerCase().includes('week 1') && title.toLowerCase().includes('thursday'))
+    );
   };
 
   if (isLoading) {
@@ -81,18 +97,35 @@ export default function Lessons() {
   }
 
   if (selectedLesson) {
-    const isLesson1 = selectedLesson.title.toLowerCase().includes('deep learning') && 
-                      (selectedLesson.title.toLowerCase().includes('lesson 1') || 
-                       selectedLesson.modules.some(m => 
-                         m.title.toLowerCase().includes('lesson 1') && 
-                         m.title.toLowerCase().includes('deep learning')));
+    const isDeepLearning = isDeepLearningLesson(selectedLesson.title);
 
     return (
-      <LessonLayout isLesson1={isLesson1}>
+      <LessonLayout>
         <div className="space-y-6">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>{selectedLesson.title}</CardTitle>
+              {isDeepLearning && (
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={() => {
+                    // Find the deep learning module to get its ID
+                    const deepLearningModule = selectedLesson.modules.find(
+                      module => isDeepLearningLesson(module.title)
+                    );
+                    
+                    if (deepLearningModule && deepLearningModule.id) {
+                      handleChatClick(deepLearningModule.id);
+                    } else {
+                      console.error("Could not find Deep Learning lesson ID");
+                    }
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Chat with AI Assistant
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none">
@@ -111,6 +144,20 @@ export default function Lessons() {
                           )}
                           <span>{module.title}</span>
                         </div>
+                        {isDeepLearningLesson(module.title) && module.id && (
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="flex items-center gap-1"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleChatClick(module.id);
+                            }}
+                          >
+                            <MessageSquare className="h-3 w-3" />
+                            AI Chat
+                          </Button>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -149,6 +196,20 @@ export default function Lessons() {
                     )}
                     <span>{module.title}</span>
                   </div>
+                  {isDeepLearningLesson(module.title) && module.id && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="flex items-center gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleChatClick(module.id);
+                      }}
+                    >
+                      <MessageSquare className="h-3 w-3" />
+                      AI Chat
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

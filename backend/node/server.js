@@ -1471,8 +1471,8 @@ const cleanupOnlineStatus = async () => {
   }
 };
 
-// Chat route handler
-app.post('/api/chat', async (req, res) => {
+// Add chat endpoints
+app.post('/api/chat', verifyToken, async (req, res) => {
   try {
     const { message } = req.body;
     
@@ -1480,101 +1480,154 @@ app.post('/api/chat', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // For now, we'll use a simple response. Later, you can integrate with an AI service
-    const response = {
-      response: `I received your message: "${message}". I'm a simple echo bot for now, but I'll be smarter soon!`
-    };
-
-    res.json(response);
+    console.log(`Received general chat message: ${message}`);
+    
+    // Generate a response - this is a simple implementation
+    // In a real app, you might integrate with an AI service
+    const response = `Thank you for your message: "${message}". This is a general chat response.`;
+    
+    // Log the request for analytics
+    console.log(`Chat request from user ${req.user.userId}: ${message}`);
+    
+    // Return the response
+    return res.json({ response });
   } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Error in chat endpoint:', error);
+    return res.status(500).json({ error: 'Failed to process chat message' });
   }
 });
 
 // Lesson-specific chat endpoint
-app.post('/api/lessons/:lessonId/chat', async (req, res) => {
+app.post('/api/lessons/:id/chat', verifyToken, async (req, res) => {
   try {
+    const lessonId = req.params.id;
     const { message } = req.body;
-    const { lessonId } = req.params;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Get lesson content using PDFIntegration
-    try {
-      const lessonContent = await pdfIntegration.getLessonContent(lessonId);
-      
-      // Prepare context from lesson content
-      const context = {
-        title: lessonContent.title,
-        summary: lessonContent.summary || '',
-        content: lessonContent.content,
-        qaPairs: lessonContent.qaPairs || []
-      };
+    console.log(`Received lesson-specific chat message for lesson ${lessonId}: ${message}`);
+    
+    // Retrieve the lesson to get its content
+    const [lessonRows] = await promisePool.query(
+      `SELECT lessons.*, 
+              courses.name as course_name, 
+              weeks.name as week_name, 
+              days.name as day_name
+       FROM lessons
+       JOIN courses ON lessons.course_id = courses.id
+       JOIN weeks ON lessons.week_id = weeks.id
+       JOIN days ON lessons.day_id = days.id
+       WHERE lessons.id = ?`,
+      [lessonId]
+    );
 
-      // First, check if there's a direct match in QA pairs
-      let aiResponse = null;
-      if (context.qaPairs.length > 0) {
-        const userQuestion = message.toLowerCase();
-        for (const pair of context.qaPairs) {
-          if (pair.question.toLowerCase().includes(userQuestion) ||
-              userQuestion.includes(pair.question.toLowerCase())) {
-            aiResponse = pair.answer;
-            break;
+    if (lessonRows.length === 0) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+    
+    const lesson = lessonRows[0];
+    
+    // Only answer questions for the Deep Learning lesson
+    const isDeepLearningLesson = 
+      (lesson.title && lesson.title.toLowerCase().includes('deep')) ||
+      (lesson.course_name && lesson.week_name && 
+       lesson.week_name.toLowerCase().includes('week 1') && 
+       lesson.day_name.toLowerCase().includes('thursday'));
+    
+    if (!isDeepLearningLesson) {
+      return res.json({ 
+        response: "I'm sorry, but I'm only trained to answer questions about the Deep Learning lesson." 
+      });
+    }
+
+    // Get the lesson content
+    let content = null;
+    try {
+      // Try to use pdfIntegration if available
+      if (typeof pdfIntegration !== 'undefined' && pdfIntegration.getLessonContent) {
+        content = await pdfIntegration.getLessonContent(lessonId);
+      }
+    } catch (error) {
+      console.error(`Error getting lesson content with pdfIntegration: ${error.message}`);
+    }
+
+    // Fall back to reading the file directly if pdfIntegration failed or isn't available
+    if (!content) {
+      try {
+        const [fileRows] = await promisePool.query(
+          'SELECT file_path FROM lesson_files WHERE lesson_id = ?',
+          [lessonId]
+        );
+        
+        if (fileRows.length > 0) {
+          const filePath = fileRows[0].file_path;
+          if (fs.existsSync(filePath)) {
+            if (filePath.endsWith('.pdf')) {
+              content = "This is a PDF lesson about Deep Learning. I can answer questions about neural networks, training methods, activation functions, and other deep learning concepts.";
+            } else {
+              content = fs.readFileSync(filePath, 'utf8');
+            }
           }
         }
+      } catch (error) {
+        console.error(`Error reading lesson file: ${error.message}`);
       }
-
-      // If no direct match, use Grok API with full context
-      if (!aiResponse) {
-        const prompt = `
-          You are an AI teaching assistant helping a student understand the following lesson:
-          Title: ${context.title}
-          
-          Summary: ${context.summary}
-          
-          Content: ${context.content}
-
-          Student question: ${message}
-
-          Please provide a clear, concise, and helpful response based on the lesson content.
-          If the question is not related to the lesson content, politely redirect the student to ask about the lesson material.
-        `;
-
-        const response = await fetch('https://api.groq.com/v1/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: 'mixtral-8x7b-32768',
-            messages: [
-              { role: 'system', content: 'You are a knowledgeable teaching assistant.' },
-              { role: 'user', content: prompt }
-            ],
-            temperature: 0.7,
-            max_tokens: 1000
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error('Grok API request failed');
-        }
-
-        const data = await response.json();
-        aiResponse = data.choices[0].message.content;
-      }
-
-      res.json({ response: aiResponse });
-    } catch (error) {
-      console.error('Error getting lesson content:', error);
-      res.status(500).json({ error: 'Failed to get lesson content' });
     }
-  } catch (error) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+
+    if (!content) {
+      content = "Deep Learning lesson content is not available, but I can still try to answer general questions about deep learning.";
+    }
+
+    // Check if the question is related to deep learning
+    const deepLearningKeywords = [
+      'neural', 'network', 'deep learning', 'machine learning', 'ai', 'artificial intelligence', 
+      'training', 'model', 'weights', 'bias', 'activation', 'function', 'backpropagation',
+      'gradient', 'loss', 'epoch', 'batch', 'tensor', 'keras', 'tensorflow', 'pytorch',
+      'convolutional', 'cnn', 'rnn', 'lstm', 'gan', 'transformer', 'supervised', 'unsupervised'
+    ];
+    
+    const isRelatedToDeepLearning = deepLearningKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    let response;
+    
+    if (isRelatedToDeepLearning) {
+      // Generate a response based on the message and content
+      // This is a simple implementation - in a real app, you'd use an AI model
+      
+      // Sample responses for specific types of questions
+      if (message.toLowerCase().includes('what is deep learning')) {
+        response = "Deep learning is a subfield of machine learning that deals with algorithms inspired by the structure and function of the human brain, known as artificial neural networks. It is widely used for tasks such as image recognition, speech processing, and natural language understanding.";
+      } else if (message.toLowerCase().includes('neural network')) {
+        response = "Neural networks are computational models inspired by biological neural networks in the human brain. They consist of layers of interconnected nodes (neurons) that process information. Each connection has a weight that adjusts during learning. Neural networks form the foundation of deep learning.";
+      } else if (message.toLowerCase().includes('activation function')) {
+        response = "Activation functions are mathematical functions applied to the outputs of neurons to introduce non-linearity, enabling the network to learn complex patterns. Common activation functions include ReLU (Rectified Linear Unit), Sigmoid, and Tanh.";
+      } else if (message.toLowerCase().includes('training')) {
+        response = "Training a deep learning model involves feeding it data, comparing its outputs to expected results, and adjusting the model's weights through backpropagation to minimize the difference between predicted and actual outputs. This process typically requires large amounts of data and computational resources.";
+      } else {
+        // Generic response about deep learning
+        response = `Based on my understanding of deep learning, ${message} relates to concepts covered in neural network architecture and training. Deep learning models learn hierarchical representations of data through multiple layers of processing. Would you like more specific information on a particular aspect of deep learning?`;
+      }
+    } else {
+      // Not related to deep learning
+      response = "I'm specifically designed to help with questions about deep learning. Could you please ask a question related to deep learning concepts, neural networks, or machine learning?";
+    }
+    
+    // Log the request for analytics
+    console.log(`Lesson chat request from user ${req.user.userId} for lesson ${lessonId}: ${message}`);
+    
+    // Return the response
+    return res.json({ response });
+    } catch (error) {
+    console.error('Error in lesson chat endpoint:', error);
+    return res.status(500).json({ error: 'Failed to process chat message' });
   }
+});
+
+// Add health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
 }); 

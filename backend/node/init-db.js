@@ -13,7 +13,7 @@ const initializeDatabase = async () => {
     
     const connection = await mysql.createConnection({
         host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'root',
+        user: process.env.DB_USER || 'Sara',
         password: process.env.DB_PASSWORD,
         database: process.env.DB_NAME || 'aischool',
         multipleStatements: true
