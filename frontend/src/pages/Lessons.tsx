@@ -41,6 +41,15 @@ export default function Lessons() {
           return;
         }
         
+        // If we got an empty array, show a message
+        if (courseStructure.length === 0) {
+          console.warn('Received empty array of courses');
+          setLessons([]);
+          setError('No courses available. Please check back later.');
+          setIsLoading(false);
+          return;
+        }
+        
         const transformedLessons = courseStructure.flatMap(course => {
           return course.weeks.map(week => {
             return {

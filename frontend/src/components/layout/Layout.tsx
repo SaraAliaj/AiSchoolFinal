@@ -157,6 +157,11 @@ export default function Layout() {
           return;
         }
         
+        // If we got an empty array, log it for debugging
+        if (coursesData.length === 0) {
+          console.warn('Received empty array of courses');
+        }
+        
         setCourses(coursesData);
       } catch (error) {
         console.error("Failed to fetch course data:", error);

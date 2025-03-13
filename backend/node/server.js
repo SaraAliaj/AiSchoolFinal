@@ -568,11 +568,14 @@ app.get('/api/lessons', async (req, res) => {
     const lessons = Array.isArray(rows) ? rows : [];
     console.log(`Returning ${lessons.length} lessons`);
     
-    res.json(lessons);
+    // Set the content type explicitly and stringify the JSON
+    res.setHeader('Content-Type', 'application/json');
+    res.send(JSON.stringify(lessons));
   } catch (error) {
     console.error('Error fetching lessons:', error);
     // Return an empty array instead of an error object
-    res.status(200).json([]);
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).send(JSON.stringify([]));
   }
 });
 

@@ -203,7 +203,19 @@ const api = {
     try {
       // Fetch lessons which include course, week, and day information
       const lessonsResponse = await axiosInstance.get('/lessons');
-      const lessons = lessonsResponse.data;
+      let lessons = lessonsResponse.data;
+
+      // Check if lessons is a string (which happens in production)
+      if (typeof lessons === 'string') {
+        console.error('Received string instead of array:', lessons);
+        try {
+          // Try to parse the string as JSON
+          lessons = JSON.parse(lessons);
+        } catch (parseError) {
+          console.error('Failed to parse string as JSON:', parseError);
+          return [];
+        }
+      }
 
       // Check if lessons is an array, if not return an empty array
       if (!Array.isArray(lessons)) {
