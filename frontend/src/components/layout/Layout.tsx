@@ -6,10 +6,7 @@ import {
   LogOut,
   Home,
   BookOpen,
-  Code,
-  CheckSquare,
   ChevronDown,
-  MessageSquare,
   Brain,
   Users,
   Settings,
@@ -17,7 +14,9 @@ import {
   Play,
   Square,
   Clock,
-  Crown
+  Crown,
+  MessageSquare,
+  Bot
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -432,9 +431,9 @@ export default function Layout() {
           <div className="flex-1 flex flex-col overflow-hidden">
             <nav className="flex-1 overflow-y-auto">
               <div className={`space-y-4 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
-                {/* AI Chat */}
-                <NavItem to="/chat" icon={MessageSquare} collapsed={isSidebarCollapsed}>
-                  AI Chat
+                {/* Change from Home to General AI Chatbot and use Bot icon */}
+                <NavItem to="/chat" icon={Bot} collapsed={isSidebarCollapsed}>
+                  General AI Chatbot
                 </NavItem>
 
                 {/* Curriculum Dropdown - Only show when expanded */}
@@ -502,19 +501,22 @@ export default function Layout() {
 
                 {/* Other navigation items */}
                 <div className="space-y-4">
-                  <NavItem to="/challenges" icon={Code} collapsed={isSidebarCollapsed}>
+                  {/* Remove these three NavItem components */}
+                  {/* 
+                  <NavItem to="/challenges" icon={Home} collapsed={isSidebarCollapsed}>
                     Challenges
                   </NavItem>
-                  <NavItem to="/quizzes" icon={CheckSquare} collapsed={isSidebarCollapsed}>
+                  <NavItem to="/quizzes" icon={Home} collapsed={isSidebarCollapsed}>
                     Quizzes
                   </NavItem>
-                  <NavItem to="/group-chat" icon={Users} collapsed={isSidebarCollapsed}>
+                  <NavItem to="/group-chat" icon={Home} collapsed={isSidebarCollapsed}>
                     Group Chat
                   </NavItem>
+                  */}
                   
                   {/* Admin link - only show for admin users */}
                   {user?.role === 'admin' && (
-                    <NavItem to="/admin" icon={Settings} collapsed={isSidebarCollapsed}>
+                    <NavItem to="/admin" icon={Crown} collapsed={isSidebarCollapsed}>
                       Admin
                     </NavItem>
                   )}

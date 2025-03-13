@@ -454,7 +454,8 @@ app.get('/api/auth/verify', verifyToken, (req, res) => {
 // Middleware for handling file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(process.cwd(), 'uploads');
+    // Change the upload directory to the Python backend's downloads directory
+    const uploadDir = path.join(process.cwd(), '..', 'python', 'downloads');
     // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       console.log(`Creating upload directory: ${uploadDir}`);
@@ -770,9 +771,12 @@ app.post('/api/lessons', (req, res) => {
         });
         
         try {
-          // Normalize the file path for database storage
-          const normalizedPath = file.path.replace(/\\/g, '/');
-          console.log(`Normalized file path: ${normalizedPath}`);
+          // Create a relative path for database storage
+          // Extract just the filename from the full path
+          const filename = path.basename(file.path);
+          // Create a relative path that will work after deployment
+          const relativePath = `downloads/${filename}`;
+          console.log(`Relative file path for database: ${relativePath}`);
           
           // Insert lesson with the new table structure
           const [result] = await connection.query(
@@ -782,7 +786,7 @@ app.post('/api/lessons', (req, res) => {
               weekIdInt,
               dayIdInt,
               title,
-              normalizedPath // Save the normalized file path in the database
+              relativePath // Save the relative file path in the database
             ]
           );
           
@@ -935,27 +939,31 @@ app.get('/api/lessons/:id/download', async (req, res) => {
     }
     
     const lesson = lessons[0];
-    const filePath = lesson.file_path;
+    const relativePath = lesson.file_path;
     
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'Lesson file not found' });
+    // Resolve the relative path to an absolute path
+    // If the path starts with 'downloads/', it's a relative path in the Python backend
+    let absolutePath;
+    if (relativePath.startsWith('downloads/')) {
+      absolutePath = path.join(process.cwd(), '..', 'python', relativePath);
+    } else {
+      // For backward compatibility with existing absolute paths
+      absolutePath = relativePath;
+    }
+    
+    console.log(`Resolved file path: ${absolutePath}`);
+    
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(404).json({ error: 'Lesson file not found', path: absolutePath });
     }
 
     // Important: Set these headers to display PDF inline
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');  // This is crucial - 'inline' instead of 'attachment'
-    res.setHeader('Accept-Ranges', 'bytes');
     
-    // Stream the file
-    const fileStream = fs.createReadStream(filePath);
+    // Stream the file to the response
+    const fileStream = fs.createReadStream(absolutePath);
     fileStream.pipe(res);
-    
-    fileStream.on('error', (error) => {
-      console.error('Error streaming PDF:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Failed to stream PDF' });
-      }
-    });
   } catch (error) {
     console.error('Error serving PDF:', error);
     res.status(500).json({ error: 'Failed to serve PDF' });

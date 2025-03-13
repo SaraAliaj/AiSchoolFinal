@@ -24,8 +24,9 @@ class PDFIntegration {
     });
     
     // Create directories if they don't exist
-    this.pdfDir = path.join(process.cwd(), 'uploads', 'pdfs');
-    this.jsonDir = path.join(process.cwd(), 'uploads', 'processed');
+    // Use the Python backend's downloads directory for PDFs
+    this.pdfDir = path.join(process.cwd(), '..', 'python', 'downloads');
+    this.jsonDir = path.join(process.cwd(), '..', 'python', 'downloads');
     
     if (!fs.existsSync(this.pdfDir)) {
       fs.mkdirSync(this.pdfDir, { recursive: true });
@@ -97,6 +98,13 @@ class PDFIntegration {
       // Read the processed JSON file
       const jsonContent = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
       
+      // Create a relative path for database storage
+      // Extract just the filename from the full path
+      const filename = path.basename(jsonPath);
+      // Create a relative path that will work after deployment
+      const relativePath = `downloads/${filename}`;
+      console.log(`Relative file path for database: ${relativePath}`);
+      
       // Insert into the database
       const [result] = await this.pool.query(
         'INSERT INTO lessons (course_id, week_id, day_id, lesson_name, file_path, summary, ai_enhanced) VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -105,7 +113,7 @@ class PDFIntegration {
           lessonInfo.weekId,
           lessonInfo.dayId,
           lessonInfo.title || jsonContent.title,
-          jsonPath,
+          relativePath, // Store the relative path instead of the absolute path
           jsonContent.summary,
           1 // Flag to indicate this is an AI-enhanced lesson
         ]

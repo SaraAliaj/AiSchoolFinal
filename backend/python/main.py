@@ -156,7 +156,16 @@ def get_lesson_info(lesson_id):
                 if not os.path.exists(file_path):
                     # Try with a relative path
                     base_dir = os.path.dirname(os.path.abspath(__file__))
-                    relative_path = os.path.join(base_dir, file_path)
+                    
+                    # If the path starts with 'downloads/', it's a relative path
+                    if file_path.startswith('downloads/'):
+                        relative_path = os.path.join(base_dir, file_path)
+                    else:
+                        # For backward compatibility with existing absolute paths
+                        # Try to find the file in the downloads directory
+                        filename = os.path.basename(file_path)
+                        relative_path = os.path.join(base_dir, 'downloads', filename)
+                    
                     print(f"Trying relative path: {relative_path}")
                     
                     if not os.path.exists(relative_path):
