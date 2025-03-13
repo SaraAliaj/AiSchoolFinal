@@ -32,6 +32,15 @@ export default function Lessons() {
       try {
         const courseStructure = await api.getCourseStructure();
         
+        // Check if courseStructure is an array
+        if (!Array.isArray(courseStructure)) {
+          console.error('Expected array of courses but received:', typeof courseStructure);
+          setLessons([]);
+          setError('Failed to load course data. Please try again later.');
+          setIsLoading(false);
+          return;
+        }
+        
         const transformedLessons = courseStructure.flatMap(course => {
           return course.weeks.map(week => {
             return {

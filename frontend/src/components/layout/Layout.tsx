@@ -149,6 +149,14 @@ export default function Layout() {
         // to return the full course structure with weeks and lessons
         const coursesData = await api.getCourseStructure();
         console.log('Course structure data:', coursesData);
+        
+        // Check if coursesData is an array
+        if (!Array.isArray(coursesData)) {
+          console.error('Expected array of courses but received:', typeof coursesData);
+          setCourses([]);
+          return;
+        }
+        
         setCourses(coursesData);
       } catch (error) {
         console.error("Failed to fetch course data:", error);

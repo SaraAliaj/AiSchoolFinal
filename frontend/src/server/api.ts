@@ -205,6 +205,12 @@ const api = {
       const lessonsResponse = await axiosInstance.get('/lessons');
       const lessons = lessonsResponse.data;
 
+      // Check if lessons is an array, if not return an empty array
+      if (!Array.isArray(lessons)) {
+        console.error('Expected array of lessons but received:', typeof lessons);
+        return [];
+      }
+
       // Group lessons by course, week, and day
       const courseMap = new Map();
 

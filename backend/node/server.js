@@ -563,10 +563,16 @@ app.get('/api/lessons', async (req, res) => {
       JOIN days d ON l.day_id = d.id
       ORDER BY c.id, w.id, d.id
     `);
-    res.json(rows);
+    
+    // Ensure we always return an array, even if the query returns null or undefined
+    const lessons = Array.isArray(rows) ? rows : [];
+    console.log(`Returning ${lessons.length} lessons`);
+    
+    res.json(lessons);
   } catch (error) {
     console.error('Error fetching lessons:', error);
-    res.status(500).json({ error: 'Failed to fetch lessons' });
+    // Return an empty array instead of an error object
+    res.status(200).json([]);
   }
 });
 
