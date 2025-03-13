@@ -12,7 +12,19 @@ import { useToast } from "@/components/ui/use-toast";
 
 interface Message {
   id: string;
-  content: string;
+  content: string | {
+    type: 'structured_summary' | 'qa_response' | 'general_response' | 'error';
+    title?: string;
+    sections?: Array<{
+      heading: string;
+      content: string | string[];
+    }>;
+    question?: string;
+    answer?: string;
+    examples?: string[];
+    references?: string[];
+    errorMessage?: string;
+  };
   sender: 'user' | 'ai';
   timestamp: Date;
 }
@@ -338,6 +350,159 @@ export default function LessonChatbot({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  const renderStructuredMessage = (message: Message) => {
+    const content = message.content;
+    const isUserMessage = message.sender === 'user';
+    
+    if (typeof content === 'string') {
+      // Format plain text messages with proper line breaks
+      return <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} whitespace-pre-line`}>{content}</p>;
+    }
+
+    switch (content.type) {
+      case 'structured_summary':
+        return (
+          <div className="space-y-4">
+            {content.title && (
+              <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">{content.title}</h3>
+            )}
+            {content.sections?.map((section, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm">
+                <h4 className="font-medium text-primary mb-3 flex items-center">
+                  {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
+                  {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
+                  {section.heading === 'Related Topics' && <BrainCircuit className="h-4 w-4 mr-2" />}
+                  {section.heading}
+                </h4>
+                {Array.isArray(section.content) ? (
+                  <ul className="space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {/* Split text by line breaks and render each line separately */}
+                    {section.content.split('\n').map((line, i) => (
+                      line.trim() ? (
+                        <p key={i} className="mb-2">{line}</p>
+                      ) : null
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'qa_response':
+        return (
+          <div className="space-y-4">
+            <div className="bg-primary/10 rounded-lg p-4 border-l-4 border-primary shadow-sm">
+              <h4 className="font-medium text-primary mb-2 flex items-center">
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Question
+              </h4>
+              <p className="text-sm text-gray-700 font-medium">{content.question}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
+              <h4 className="font-medium text-green-600 mb-2 flex items-center">
+                <Sparkles className="h-4 w-4 mr-2" />
+                Answer
+              </h4>
+              <div className="text-sm text-gray-700 leading-relaxed">
+                {/* Split answer by line breaks and render each line separately */}
+                {content.answer?.split('\n').map((line, i) => (
+                  line.trim() ? (
+                    <p key={i} className="mb-2">{line}</p>
+                  ) : null
+                ))}
+              </div>
+            </div>
+            {content.examples && content.examples.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-400 shadow-sm">
+                <h4 className="font-medium text-blue-500 mb-2 flex items-center">
+                  <FileIcon className="h-4 w-4 mr-2" />
+                  Examples
+                </h4>
+                <ul className="space-y-2">
+                  {content.examples.map((example, i) => (
+                    <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
+                      {example}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {content.references && content.references.length > 0 && (
+              <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-amber-400 shadow-sm">
+                <h4 className="font-medium text-amber-600 mb-2 flex items-center">
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  References
+                </h4>
+                <ul className="space-y-2">
+                  {content.references.map((ref, i) => (
+                    <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-amber-200 ml-2">
+                      {ref}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        );
+
+      case 'general_response':
+        return (
+          <div className="space-y-4">
+            {content.title && (
+              <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">{content.title}</h3>
+            )}
+            {content.sections?.map((section, index) => (
+              <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm mb-3">
+                <h4 className="font-medium text-primary mb-2 flex items-center">
+                  {section.heading === 'Response' && <MessageSquare className="h-4 w-4 mr-2" />}
+                  {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
+                  {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
+                  {section.heading}
+                </h4>
+                {Array.isArray(section.content) ? (
+                  <ul className="space-y-2">
+                    {section.content.map((item, i) => (
+                      <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {/* Split text by line breaks and render each line separately */}
+                    {section.content.split('\n').map((line, i) => (
+                      line.trim() ? (
+                        <p key={i} className="mb-2">{line}</p>
+                      ) : null
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'error':
+        return (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <p className="text-sm text-red-600">{content.errorMessage || 'An error occurred'}</p>
+          </div>
+        );
+
+      default:
+        return <p className="text-sm text-gray-700">{JSON.stringify(content)}</p>;
+    }
+  };
+
   return (
     <div className="flex h-screen gap-2 bg-slate-100 p-2">
       {/* PDF Viewer Section - 50% width */}
@@ -415,7 +580,7 @@ export default function LessonChatbot({
                         : 'bg-white border border-slate-200 rounded-tl-none'
                     }`}
                   >
-                    <p className={`text-sm ${message.sender === 'ai' ? 'text-slate-800' : ''}`}>{message.content}</p>
+                    {renderStructuredMessage(message)}
                   </div>
                   <p className="text-xs text-slate-500 px-2 flex items-center">
                     <Clock className="h-3 w-3 mr-1" />

@@ -40,40 +40,126 @@ async def process_message(data):
         
         print(f"Processing message for lesson {lesson_id}: {user_message}")
         
-        # Get lesson content using the PDF integration
         try:
             lesson_data = await asyncio.to_thread(pdf_processor.getLessonContent, lesson_id)
             
-            # Check if we have QA pairs to match against
+            # Handle summary requests
+            if any(keyword in user_message.lower() for keyword in ['summary', 'summarize', 'overview']):
+                title = lesson_data.get('title', 'Unknown Lesson')
+                summary = lesson_data.get('summary', '')
+                key_points = lesson_data.get('key_points', [])
+                
+                # Format the summary text to remove any hash symbols and ensure proper line breaks
+                if summary:
+                    summary = summary.replace('#', '').strip()
+                
+                structured_response = {
+                    'message': {
+                        'type': 'structured_summary',
+                        'title': title,
+                        'sections': [
+                            {
+                                'heading': 'Summary',
+                                'content': summary
+                            }
+                        ]
+                    },
+                    'sender': 'bot',
+                    'lesson_title': title
+                }
+                
+                # Add key points if available
+                if key_points:
+                    # Clean up key points to remove hash symbols
+                    cleaned_key_points = [point.replace('#', '').strip() for point in key_points]
+                    structured_response['message']['sections'].append({
+                        'heading': 'Key Points',
+                        'content': cleaned_key_points
+                    })
+                
+                # Add related topics if available
+                if lesson_data.get('related_topics'):
+                    # Clean up related topics to remove hash symbols
+                    cleaned_topics = [topic.replace('#', '').strip() for topic in lesson_data['related_topics']]
+                    structured_response['message']['sections'].append({
+                        'heading': 'Related Topics',
+                        'content': cleaned_topics
+                    })
+                
+                return structured_response
+            
+            # Handle QA pairs with structured responses
             if lesson_data.get('qaPairs') and len(lesson_data['qaPairs']) > 0:
-                # Try to find a direct match in QA pairs
                 for qa_pair in lesson_data['qaPairs']:
                     if user_message.lower() in qa_pair['question'].lower():
+                        # Clean up answer to remove hash symbols and ensure proper line breaks
+                        cleaned_answer = qa_pair['answer'].replace('#', '').strip()
+                        
+                        # Split answer by line breaks and clean each line
+                        if '\n' in cleaned_answer:
+                            answer_lines = cleaned_answer.split('\n')
+                            cleaned_answer = '\n'.join([line.strip() for line in answer_lines if line.strip()])
+                        
                         return {
-                            'message': qa_pair['answer'],
-                            'sender': 'bot',
-                            'matched': True
-                        }
-            # If lesson_data has qa_pairs instead of qaPairs (handle both formats)
-            elif lesson_data.get('qa_pairs') and len(lesson_data['qa_pairs']) > 0:
-                # Try to find a direct match in QA pairs
-                for qa_pair in lesson_data['qa_pairs']:
-                    if user_message.lower() in qa_pair['question'].lower():
-                        return {
-                            'message': qa_pair['answer'],
+                            'message': {
+                                'type': 'qa_response',
+                                'question': qa_pair['question'],
+                                'answer': cleaned_answer,
+                                'examples': qa_pair.get('examples', []),
+                                'references': qa_pair.get('references', [])
+                            },
                             'sender': 'bot',
                             'matched': True
                         }
             
-            # If no direct match, construct a response based on lesson content
+            # Default structured response for general questions
             title = lesson_data.get('title', 'Unknown Lesson')
             content = lesson_data.get('content', '')
             summary = lesson_data.get('summary', '')
             
-            response = f"Based on the lesson '{title}', I can tell you that {summary}\n\nRegarding your question: {user_message}\n\nThe lesson covers this topic in detail."
+            # Clean up content to remove hash symbols and ensure proper line breaks
+            if content:
+                content = content.replace('#', '').strip()
+                # Split content by line breaks and clean each line
+                if '\n' in content:
+                    content_lines = content.split('\n')
+                    content = '\n'.join([line.strip() for line in content_lines if line.strip()])
+            
+            # Clean up summary to remove hash symbols
+            if summary:
+                summary = summary.replace('#', '').strip()
+            
+            # Create a more structured response for general questions
+            response_sections = []
+            
+            # Add a direct response section
+            response_sections.append({
+                'heading': 'Response',
+                'content': f"Based on your question: {user_message}\n\n{content}"
+            })
+            
+            # Add a summary section if available
+            if summary:
+                response_sections.append({
+                    'heading': 'Summary',
+                    'content': summary
+                })
+            
+            # Add key points if available
+            if lesson_data.get('key_points'):
+                # Clean up key points to remove hash symbols
+                cleaned_key_points = [point.replace('#', '').strip() for point in lesson_data['key_points']]
+                response_sections.append({
+                    'heading': 'Key Points',
+                    'content': cleaned_key_points
+                })
             
             return {
-                'message': response,
+                'message': {
+                    'type': 'general_response',
+                    'title': title,
+                    'sections': response_sections
+                },
                 'sender': 'bot',
                 'lesson_title': title
             }
@@ -81,7 +167,10 @@ async def process_message(data):
         except Exception as e:
             print(f"Error getting lesson content: {str(e)}")
             return {
-                'message': f"I'm sorry, I couldn't retrieve information for this lesson. Error: {str(e)}",
+                'message': {
+                    'type': 'error',
+                    'content': f"I'm sorry, I couldn't retrieve information for this lesson. Error: {str(e)}"
+                },
                 'sender': 'bot',
                 'error': True
             }
@@ -89,7 +178,10 @@ async def process_message(data):
     except Exception as e:
         print(f"Error processing message: {str(e)}")
         return {
-            'message': f"I'm sorry, I encountered an error processing your question: {str(e)}",
+            'message': {
+                'type': 'error',
+                'content': f"I'm sorry, I encountered an error processing your question: {str(e)}"
+            },
             'sender': 'bot',
             'error': True
         }

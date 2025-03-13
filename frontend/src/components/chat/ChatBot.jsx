@@ -265,6 +265,106 @@ const ChatBot = ({ lessonId }) => {
       minute: '2-digit'
     }).format(timestamp);
 
+    // Check if the message is structured (JSON object)
+    let structuredContent = null;
+    if (typeof text === 'object') {
+      structuredContent = text;
+    } else if (typeof text === 'string') {
+      try {
+        // Try to parse as JSON if it's a string that might be JSON
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+          structuredContent = JSON.parse(text);
+        }
+      } catch (e) {
+        // Not valid JSON, continue with text rendering
+      }
+    }
+
+    // Render structured content if available
+    if (structuredContent && structuredContent.type) {
+      return (
+        <div
+          key={id}
+          className={`flex mb-4 ${isBot ? 'justify-start' : 'justify-end'}`}
+        >
+          <div
+            className={`flex max-w-[80%] rounded-lg p-4 ${
+              isBot
+                ? 'bg-white border border-gray-200 shadow-sm'
+                : 'bg-primary text-white'
+            }`}
+          >
+            <div className="flex-shrink-0 mr-3">
+              {isBot ? (
+                <Sparkles className="h-5 w-5 text-primary" />
+              ) : (
+                <User className="h-5 w-5 text-white" />
+              )}
+            </div>
+            <div className="flex flex-col w-full">
+              {structuredContent.title && (
+                <h3 className={`text-lg font-semibold ${isBot ? 'text-primary' : 'text-white'} border-b pb-2 mb-3`}>
+                  {structuredContent.title}
+                </h3>
+              )}
+              
+              {/* Render sections if available */}
+              {structuredContent.sections && structuredContent.sections.map((section, index) => (
+                <div key={index} className={`bg-gray-50 rounded-lg p-4 border-l-4 ${isBot ? 'border-primary' : 'border-white/70'} shadow-sm mb-3`}>
+                  <h4 className={`font-medium ${isBot ? 'text-primary' : 'text-white'} mb-2`}>{section.heading}</h4>
+                  {Array.isArray(section.content) ? (
+                    <ul className="space-y-2">
+                      {section.content.map((item, i) => (
+                        <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-gray-700 leading-relaxed">
+                      {/* Split text by line breaks and render each line separately */}
+                      {section.content.split('\n').map((line, i) => (
+                        line.trim() ? (
+                          <p key={i} className="mb-2">{line}</p>
+                        ) : null
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* Render question/answer if available */}
+              {structuredContent.question && (
+                <div className="bg-primary/10 rounded-lg p-4 border-l-4 border-primary shadow-sm mb-3">
+                  <h4 className="font-medium text-primary mb-2">Question</h4>
+                  <p className="text-sm text-gray-700 font-medium">{structuredContent.question}</p>
+                </div>
+              )}
+              
+              {structuredContent.answer && (
+                <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm mb-3">
+                  <h4 className="font-medium text-green-600 mb-2">Answer</h4>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {/* Split answer by line breaks and render each line separately */}
+                    {structuredContent.answer.split('\n').map((line, i) => (
+                      line.trim() ? (
+                        <p key={i} className="mb-2">{line}</p>
+                      ) : null
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-white/80'}`}>
+                {time}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Default rendering for plain text messages
     return (
       <div
         key={id}
@@ -285,7 +385,14 @@ const ChatBot = ({ lessonId }) => {
             )}
           </div>
           <div className="flex flex-col">
-            <div className="whitespace-pre-wrap">{text}</div>
+            <div className="whitespace-pre-line">
+              {/* Split text by line breaks and render each line separately */}
+              {text.split('\n').map((line, i) => (
+                line.trim() ? (
+                  <p key={i} className="mb-2">{line}</p>
+                ) : null
+              ))}
+            </div>
             <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-primary-foreground/80'}`}>
               {time}
             </div>
