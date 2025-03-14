@@ -10,6 +10,23 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { api } from "@/server/api";
 import { useToast } from "@/components/ui/use-toast";
 
+interface LessonContent {
+  id: string;
+  title: string;
+  content: string;
+  summary?: string;
+  sections?: Array<{
+    heading: string;
+    content: string | string[];
+  }>;
+  qaPairs?: Array<{
+    question: string;
+    answer: string;
+  }>;
+  fileType?: string;
+  fileName?: string;
+}
+
 interface Message {
   id: string;
   content: string | {
@@ -37,17 +54,6 @@ interface Section {
 interface QAPair {
   question: string;
   answer: string;
-}
-
-interface LessonContent {
-  id: string;
-  title: string;
-  content: string;
-  summary?: string;
-  sections?: Section[];
-  qaPairs?: QAPair[];
-  fileType?: string;
-  fileName?: string;
 }
 
 interface LessonChatbotProps {
@@ -120,7 +126,12 @@ export default function LessonChatbot({
         console.log('Message from server:', event.data);
         try {
           // Try to parse the response as JSON
-          const jsonData = JSON.parse(event.data);
+          const jsonData = JSON.parse(event.data) as { 
+            response?: string; 
+            error?: string; 
+            content?: LessonContent;
+            type?: string;
+          };
           
           // Check if there's an error
           if (jsonData.error) {
@@ -132,12 +143,17 @@ export default function LessonChatbot({
             setIsLoading(false);
             return;
           }
+
+          // Handle lesson content if present
+          if (jsonData.content && jsonData.type === 'lesson_content') {
+            setLessonContent(jsonData.content as LessonContent);
+          }
           
           // Only add AI response if it's not a connection message
-          if (!jsonData.response?.includes("Connected to")) {
+          if (jsonData.response && !jsonData.response.includes("Connected to")) {
             const aiMessage: Message = {
               id: Date.now().toString(),
-              content: jsonData.response || event.data,
+              content: jsonData.response,
               sender: 'ai',
               timestamp: new Date()
             };
@@ -204,8 +220,13 @@ export default function LessonChatbot({
     const fetchLessonContent = async () => {
       setIsLoadingContent(true);
       try {
-        const data = await api.getLessonContent(lessonId);
-        setLessonContent(data);
+        const response = await api.getLessonContent(lessonId);
+        const responseData = response as { id?: string; title?: string; content?: string };
+        setLessonContent({
+          id: responseData.id || lessonId,
+          title: responseData.title || lessonTitle,
+          content: responseData.content || 'Error loading lesson content.'
+        });
       } catch (error) {
         console.error('Failed to fetch lesson content:', error);
         setLessonContent({
@@ -355,8 +376,8 @@ export default function LessonChatbot({
     const isUserMessage = message.sender === 'user';
     
     if (typeof content === 'string') {
-      // Format plain text messages with proper line breaks
-      return <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} whitespace-pre-line`}>{content}</p>;
+      // Format plain text messages with proper line breaks and make AI messages bold
+      return <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700 font-semibold'} whitespace-pre-line`}>{content}</p>;
     }
 
     switch (content.type) {
@@ -364,34 +385,29 @@ export default function LessonChatbot({
         return (
           <div className="space-y-4">
             {content.title && (
-              <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">{content.title}</h3>
+              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{content.title}</h3>
             )}
             {content.sections?.map((section, index) => (
               <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm">
-                <h4 className="font-medium text-primary mb-3 flex items-center">
+                <h4 className="font-bold text-primary mb-3 flex items-center">
                   {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
                   {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
                   {section.heading === 'Related Topics' && <BrainCircuit className="h-4 w-4 mr-2" />}
                   {section.heading}
                 </h4>
-                {Array.isArray(section.content) ? (
-                  <ul className="space-y-2">
-                    {section.content.map((item, i) => (
-                      <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-sm text-gray-700 leading-relaxed">
-                    {/* Split text by line breaks and render each line separately */}
-                    {section.content.split('\n').map((line, i) => (
-                      line.trim() ? (
-                        <p key={i} className="mb-2">{line}</p>
-                      ) : null
-                    ))}
-                  </div>
-                )}
+                <div className="text-sm text-gray-700 font-semibold leading-relaxed">
+                  {Array.isArray(section.content) ? (
+                    <ul className="space-y-2">
+                      {section.content.map((item, i) => (
+                        <li key={i} className="pl-2 border-l-2 border-gray-300 ml-2">{item}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    section.content.split('\n').map((line, i) => (
+                      line.trim() ? <p key={i} className="mb-2">{line}</p> : null
+                    ))
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -401,19 +417,18 @@ export default function LessonChatbot({
         return (
           <div className="space-y-4">
             <div className="bg-primary/10 rounded-lg p-4 border-l-4 border-primary shadow-sm">
-              <h4 className="font-medium text-primary mb-2 flex items-center">
+              <h4 className="font-bold text-primary mb-2 flex items-center">
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Question
               </h4>
               <p className="text-sm text-gray-700 font-medium">{content.question}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
-              <h4 className="font-medium text-green-600 mb-2 flex items-center">
+              <h4 className="font-bold text-green-600 mb-2 flex items-center">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Answer
               </h4>
-              <div className="text-sm text-gray-700 leading-relaxed">
-                {/* Split answer by line breaks and render each line separately */}
+              <div className="text-sm text-gray-700 font-semibold leading-relaxed">
                 {content.answer?.split('\n').map((line, i) => (
                   line.trim() ? (
                     <p key={i} className="mb-2">{line}</p>
@@ -423,13 +438,13 @@ export default function LessonChatbot({
             </div>
             {content.examples && content.examples.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-400 shadow-sm">
-                <h4 className="font-medium text-blue-500 mb-2 flex items-center">
+                <h4 className="font-bold text-blue-500 mb-2 flex items-center">
                   <FileIcon className="h-4 w-4 mr-2" />
                   Examples
                 </h4>
                 <ul className="space-y-2">
                   {content.examples.map((example, i) => (
-                    <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
+                    <li key={i} className="text-sm text-gray-700 font-semibold leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
                       {example}
                     </li>
                   ))}
@@ -504,24 +519,22 @@ export default function LessonChatbot({
   };
 
   return (
-    <div className="flex h-screen gap-2 bg-slate-100 p-2">
+    <div className="flex h-screen gap-4 bg-slate-100 p-4">
       {/* PDF Viewer Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-1rem)] bg-white rounded-lg shadow-lg overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-4">
-          <h2 className="text-xl font-bold flex items-center">
-            <FileText className="mr-2 h-5 w-5 text-primary" />
+      <div className="w-1/2 h-[calc(100vh-2rem)] bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
+        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-slate-50 to-white border-b">
+          <h2 className="text-xl font-bold flex items-center text-slate-800">
+            <FileText className="mr-3 h-5 w-5 text-primary" />
             {lessonTitle}
           </h2>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              className="flex items-center gap-2"
-              onClick={() => window.open(api.downloadLessonFile(lessonId), '_blank')}
-            >
-              <Download className="h-4 w-4" />
-              Download PDF
-            </Button>
-          </div>
+          <Button 
+            variant="outline" 
+            className="flex items-center gap-2 hover:bg-slate-50 transition-all duration-200"
+            onClick={() => window.open(api.downloadLessonFile(lessonId), '_blank')}
+          >
+            <Download className="h-4 w-4" />
+            Download PDF
+          </Button>
         </div>
         
         {/* PDF Viewer Container */}
@@ -536,76 +549,76 @@ export default function LessonChatbot({
       </div>
 
       {/* Chat Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-1rem)] flex flex-col bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="w-1/2 h-[calc(100vh-2rem)] flex flex-col bg-white rounded-xl shadow-lg overflow-hidden">
         {/* Chat header */}
-        <div className="px-6 py-4 border-b bg-gradient-to-r from-primary/10 to-primary/5 flex items-center">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/15 flex items-center justify-center shadow-inner">
+        <div className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
               <BrainCircuit className="h-6 w-6 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-slate-800 text-lg">AI Learning Assistant</h3>
+              <p className="text-xs text-slate-500">Powered by advanced AI</p>
             </div>
           </div>
         </div>
         
-        {/* Messages area - Adjust height to account for header and input area */}
-        <ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-6 bg-slate-50/50">
-          <div className="space-y-6 max-w-[95%] mx-auto">
+        {/* Messages area */}
+        <ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-6 bg-gradient-to-b from-slate-50/50 to-white/30">
+          <div className="space-y-8 max-w-[95%] mx-auto">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start gap-3 ${
+                className={`flex items-start gap-4 ${
                   message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
                 {message.sender === 'user' ? (
-                  <Avatar className="h-8 w-8 border border-primary/20">
-                    <AvatarFallback className="bg-secondary text-primary text-xs">
-                      {/* You can use initials or a custom icon here */}
+                  <Avatar className="h-9 w-9 border-2 border-primary/10 shadow-sm">
+                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary text-xs">
                       <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                    <BrainCircuit className="h-4 w-4 text-primary" />
+                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                    <BrainCircuit className="h-5 w-5 text-primary" />
                   </div>
                 )}
                 
-                <div className={`space-y-1 max-w-[80%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`space-y-1.5 max-w-[85%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`rounded-2xl px-4 py-2.5 shadow-sm ${
+                    className={`rounded-2xl px-5 py-3 shadow-sm transition-all duration-200 ${
                       message.sender === 'user'
-                        ? 'bg-primary text-primary-foreground rounded-tr-none'
-                        : 'bg-white border border-slate-200 rounded-tl-none'
+                        ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-tr-none'
+                        : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-md'
                     }`}
                   >
                     {renderStructuredMessage(message)}
                   </div>
-                  <p className="text-xs text-slate-500 px-2 flex items-center">
-                    <Clock className="h-3 w-3 mr-1" />
+                  <p className="text-xs text-slate-400 px-2 flex items-center">
+                    <Clock className="h-3 w-3 mr-1 opacity-70" />
                     {formatTime(message.timestamp)}
                   </p>
                 </div>
               </div>
             ))}
             
-            {/* Loading indicator when AI is preparing a response */}
+            {/* Loading indicator */}
             {isLoading && (
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
-                  <BrainCircuit className="h-4 w-4 text-primary" />
+              <div className="flex items-start gap-4">
+                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                  <BrainCircuit className="h-5 w-5 text-primary" />
                 </div>
                 
-                <div className="space-y-1 max-w-[80%]">
-                  <div className="rounded-2xl rounded-tl-none px-4 py-3 bg-white border border-slate-200 shadow-sm">
+                <div className="space-y-1.5 max-w-[85%]">
+                  <div className="rounded-2xl rounded-tl-none px-5 py-4 bg-white border border-slate-200 shadow-sm">
                     <div className="flex items-center">
-                      <div className="flex space-x-1.5">
+                      <div className="flex space-x-2">
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '300ms' }}></div>
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '600ms' }}></div>
                       </div>
-                      <span className="ml-3 text-sm text-slate-500">Thinking...</span>
+                      <span className="ml-3 text-sm text-slate-400">Processing your request...</span>
                     </div>
                   </div>
                 </div>
@@ -617,19 +630,19 @@ export default function LessonChatbot({
         </ScrollArea>
 
         {/* Input area */}
-        <div className="p-4 border-t bg-white shadow-lg">
+        <div className="p-4 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm">
           <form onSubmit={handleSubmit} className="flex gap-3 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about this lesson..."
               disabled={isLoading}
-              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-slate-50 py-6 rounded-xl shadow-inner"
+              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 py-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
             />
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-primary hover:bg-primary/90 transition-colors rounded-full h-12 w-12 p-0 flex items-center justify-center shadow-lg"
+              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-xl h-12 w-12 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />

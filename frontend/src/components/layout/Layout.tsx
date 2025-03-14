@@ -449,8 +449,22 @@ export default function Layout() {
                   General AI Chatbot
                 </NavItem>
 
-                {/* Curriculum Dropdown - Only show when expanded */}
-                {!isSidebarCollapsed && (
+                {/* Curriculum Dropdown */}
+                {isSidebarCollapsed ? (
+                  <div className="flex justify-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-9 w-9 relative ${activeLesson ? 'bg-green-50 text-green-600 hover:bg-green-100' : ''}`}
+                      onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
+                    >
+                      <BookOpen className="h-5 w-5" />
+                      {activeLesson && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
+                      )}
+                    </Button>
+                  </div>
+                ) : (
                   <Collapsible open={isCurriculumOpen} onOpenChange={setIsCurriculumOpen} className="flex-shrink-0">
                     <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2 text-gray-900 transition-all hover:bg-gray-200 font-bold text-base rounded-lg">
                       <div className="flex items-center space-x-3">
