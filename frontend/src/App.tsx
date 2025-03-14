@@ -13,6 +13,7 @@ import Chat from "@/pages/Chat";
 import NotFound from "./pages/NotFound";
 import Admin from "@/pages/Admin";
 import LessonChat from "@/components/chat/LessonChat";
+import LessonPage from "@/pages/LessonPage";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route index element={<Navigate to="/chat" replace />} />
               <Route path="chat" element={<Chat />} />
               <Route path="lessons" element={<Lessons />} />
+              <Route path="lessons/:lessonId" element={<LessonPage />} />
               <Route path="lessons/:lessonId/chat" element={<LessonChat />} />
               <Route 
                 path="admin" 

@@ -8,9 +8,10 @@
     "frontend:build": "cd frontend && npm run build",
     "backend:node": "cd backend/node && npm run dev",
     "backend:python": "cd backend/python && python main.py",
+    "websocket": "cd backend/node && node websocket-server.js",
     "init-db": "cd backend/node && npm run init-db",
     "check-db": "cd backend/node && npm run check-db",
-    "start": "concurrently \"npm run backend:node\" \"npm run backend:python\" \"npm run frontend:dev\""
+    "start": "concurrently \"npm run backend:node\" \"npm run backend:python\" \"npm run websocket\" \"npm run frontend:dev\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

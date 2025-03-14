@@ -207,7 +207,7 @@ const api = {
 
       // Check if lessons is a string (which happens in production)
       if (typeof lessons === 'string') {
-        console.error('Received string instead of array:', lessons);
+        console.log('Received string instead of array:', lessons);
         try {
           // Try to parse the string as JSON
           lessons = JSON.parse(lessons);
@@ -230,7 +230,6 @@ const api = {
       lessons.forEach(lesson => {
         const courseId = lesson.course_id.toString();
         const weekId = lesson.week_id.toString();
-        const dayId = lesson.day_id.toString();
         
         // Initialize course if not exists
         if (!courseMap.has(courseId)) {
@@ -252,7 +251,7 @@ const api = {
           });
         }
         
-        // Add lesson to the week
+        // Add lesson to the week using the database ID directly
         course.weeks.get(weekId).lessons.push({
           id: lesson.id.toString(),
           name: `${lesson.day_name}: ${lesson.title}`,
@@ -389,16 +388,17 @@ const api = {
   },
 
   // Add a method for lesson-specific chat
-  sendLessonChatMessage: async (lessonId: string, message: string) => {
+  sendLessonChat: async (lessonId: string, message: string) => {
     try {
-      console.log(`Sending chat message to lesson ${lessonId}:`, message);
-      const response = await axiosInstance.post(`/lessons/${lessonId}/chat`, {
-        message,
-        lessonId
-      });
+      const response = await axiosInstance.post(`/lessons/${lessonId}/chat`, { message });
       return response.data;
-    } catch (error) {
-      console.error('Failed to send chat message:', error);
+    } catch (error: any) {
+      if (error.response && error.response.status === 404) {
+        // If 404, try direct URL as fallback
+        console.log('Retrying lesson chat with direct URL...');
+        const directResponse = await axios.post(`${getDirectApiUrl()}/lessons/${lessonId}/chat`, { message });
+        return directResponse.data;
+      }
       throw error;
     }
   },

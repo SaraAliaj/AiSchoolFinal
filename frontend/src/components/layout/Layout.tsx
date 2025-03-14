@@ -16,7 +16,10 @@ import {
   Clock,
   Crown,
   MessageSquare,
-  Bot
+  Bot,
+  Calendar,
+  GraduationCap,
+  BookOpenCheck
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -116,29 +119,72 @@ export default function Layout() {
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
   const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [isCurriculumOpen, setIsCurriculumOpen] = useState(false);
-  const [activeLesson, setActiveLesson] = useState<{id: string, name: string} | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [activeLessonSession, setActiveLessonSession] = useState<{
-    lessonId: string;
-    startTime: Date;
-  } | null>(null);
-  const socketRef = useRef<any>(null); // Using any temporarily for socket type
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationData, setNotificationData] = useState<{
-    lessonName: string;
-    teacherName: string;
-    duration: number;
-  } | null>(null);
-  const [selectedDuration, setSelectedDuration] = useState<string>("");
-  const [showDurationDialog, setShowDurationDialog] = useState(false);
-  const [selectedLessonToStart, setSelectedLessonToStart] = useState<{id: string, name: string} | null>(null);
-  const [lessonEndTimer, setLessonEndTimer] = useState<NodeJS.Timeout | null>(null);
-  const [showEndNotification, setShowEndNotification] = useState(false);
-  const [endNotificationData, setEndNotificationData] = useState<{
-    lessonName: string;
-  } | null>(null);
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const handleLessonClick = (lesson: Lesson) => {
+    navigate(`/lessons/${lesson.id}`);
+  };
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(!isSidebarCollapsed);
+  };
+
+  const toggleCourse = (courseId: string) => {
+    setOpenCourses(prev => 
+      prev.includes(courseId) 
+        ? prev.filter(id => id !== courseId)
+        : [...prev, courseId]
+    );
+  };
+
+  const toggleWeek = (weekId: string) => {
+    setOpenWeeks(prev => 
+      prev.includes(weekId) 
+        ? prev.filter(id => id !== weekId)
+        : [...prev, weekId]
+    );
+  };
+
+  const toggleLessonComplete = (lessonId: string) => {
+    setCompletedLessons(prev => 
+      prev.includes(lessonId) 
+        ? prev.filter(id => id !== lessonId)
+        : [...prev, lessonId]
+    );
+  };
+
+  // Render lesson item
+  const renderLesson = (lesson: Lesson, course: Course, week: Week) => {
+    return (
+      <div
+        key={lesson.id}
+        className="flex items-center justify-between px-3 py-2 text-sm text-gray-800 hover:bg-gray-200 rounded-lg cursor-pointer"
+        onClick={() => handleLessonClick(lesson)}
+      >
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{lesson.name}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-600">{lesson.time}</span>
+        </div>
+      </div>
+    );
+  };
+
+  // Function to format duration
+  const formatDuration = (startTime: Date) => {
+    const duration = new Date().getTime() - startTime.getTime();
+    const minutes = Math.floor(duration / 60000);
+    const seconds = Math.floor((duration % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
 
   // Fetch courses data when component mounts
   useEffect(() => {
@@ -174,217 +220,6 @@ export default function Layout() {
 
     fetchCourseData();
   }, []);
-
-  // Initialize WebSocket connection
-  useEffect(() => {
-    // Create a dummy manager to prevent errors
-    // This is a temporary solution until the Socket.IO server is properly implemented
-    const dummyManager = {
-      socket: () => ({
-        on: (event: string, callback: Function) => {
-          // Only log connect_error to avoid flooding the console
-          if (event === 'connect_error') {
-            console.log('Socket.IO connection disabled temporarily');
-          }
-        },
-        emit: () => {},
-        disconnect: () => {}
-      })
-    };
-    
-    // Use the dummy manager instead of trying to connect to a non-existent Socket.IO server
-    const socket = dummyManager.socket();
-    socketRef.current = socket;
-
-    // No need to attempt connection or register handlers
-    
-    return () => {
-      // No need to disconnect
-    };
-  }, [activeLessonSession, activeLesson, user]);
-
-  // Clean up timer on unmount
-  useEffect(() => {
-    return () => {
-      if (lessonEndTimer) {
-        clearTimeout(lessonEndTimer);
-      }
-    };
-  }, [lessonEndTimer]);
-
-  const toggleCourse = (courseId: string) => {
-    setOpenCourses(prev => 
-      prev.includes(courseId) 
-        ? prev.filter(id => id !== courseId)
-        : [...prev, courseId]
-    );
-  };
-
-  const toggleWeek = (weekId: string) => {
-    setOpenWeeks(prev => 
-      prev.includes(weekId) 
-        ? prev.filter(id => id !== weekId)
-        : [...prev, weekId]
-    );
-  };
-
-  const toggleLessonComplete = (lessonId: string) => {
-    setCompletedLessons(prev => 
-      prev.includes(lessonId) 
-        ? prev.filter(id => id !== lessonId)
-        : [...prev, lessonId]
-    );
-  };
-
-  const handleSignOut = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const handleLessonClick = (lesson: Lesson) => {
-    if (activeLessonSession) {
-      navigate(`/lesson/${lesson.id}`);
-    } else {
-      setSelectedLessonToStart({ id: lesson.id, name: lesson.name });
-      setShowDurationDialog(true);
-    }
-  };
-
-  // Check if user has admin role
-  const isAdmin = user?.role === 'admin';
-
-  const toggleSidebar = () => {
-    setIsSidebarCollapsed(!isSidebarCollapsed);
-  };
-
-  const startLesson = () => {
-    if (!selectedLessonToStart || !selectedDuration || !user) return;
-
-    if (user.role !== 'lead_student') {
-      toast({
-        title: "Permission Denied",
-        description: "Only lead students can start lessons.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const duration = parseInt(selectedDuration);
-    socketRef.current?.emit('startLesson', {
-      lessonId: selectedLessonToStart.id,
-      duration,
-      teacherName: user.username,
-    });
-
-    // Set active lesson and session
-    setActiveLesson(selectedLessonToStart);
-    setActiveLessonSession({
-      lessonId: selectedLessonToStart.id,
-      startTime: new Date(),
-    });
-
-    setShowDurationDialog(false);
-    setSelectedDuration("");
-    setSelectedLessonToStart(null);
-
-    // Set a timer to end the lesson
-    const timer = setTimeout(() => {
-      socketRef.current?.emit('endLesson', {
-        lessonId: selectedLessonToStart.id,
-      });
-      setEndNotificationData({
-        lessonName: selectedLessonToStart.name,
-      });
-      setShowEndNotification(true);
-      setActiveLessonSession(null);
-      setActiveLesson(null);
-    }, duration * 60 * 1000);
-
-    setLessonEndTimer(timer);
-  };
-
-  // Function to format duration
-  const formatDuration = (startTime: Date) => {
-    const duration = new Date().getTime() - startTime.getTime();
-    const minutes = Math.floor(duration / 60000);
-    const seconds = Math.floor((duration % 60000) / 1000);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  };
-
-  // Modify the lesson rendering part in the curriculum section
-  const renderLesson = (lesson: Lesson, course: Course, week: Week) => {
-    const isActive = activeLessonSession?.lessonId === lesson.id;
-    
-    return (
-      <div
-        key={lesson.id}
-        className={cn(
-          "flex items-center justify-between px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 rounded-lg cursor-pointer",
-          isActive && "bg-green-50"
-        )}
-        onClick={() => handleLessonClick(lesson)}
-      >
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{lesson.name}</span>
-          {isActive && (
-            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-              Active
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs">{lesson.time}</span>
-        </div>
-      </div>
-    );
-  };
-
-  const renderUserInfo = () => {
-    const getRoleDisplay = () => {
-      switch (user?.role) {
-        case 'lead_student':
-          return {
-            label: 'Lead Student',
-            className: "bg-gradient-to-r from-amber-200 to-yellow-400 text-amber-900 border border-amber-300 shadow-sm",
-            icon: <Crown className="w-3 h-3 mr-1 text-amber-700" />
-          };
-        case 'admin':
-          return {
-            label: 'Administrator',
-            className: "bg-purple-100 text-purple-800",
-            icon: <Settings className="w-3 h-3 mr-1 text-purple-700" />
-          };
-        case 'student':
-          return {
-            label: 'Student',
-            className: "bg-blue-100 text-blue-800",
-            icon: <BookOpen className="w-3 h-3 mr-1 text-blue-700" />
-          };
-        default:
-          return {
-            label: user?.role || 'User',
-            className: "bg-gray-100 text-gray-800",
-            icon: null
-          };
-      }
-    };
-
-    const roleInfo = getRoleDisplay();
-
-    return (
-      <div className="transition-opacity duration-300">
-        <div className="font-medium text-sm leading-tight">{user?.username}</div>
-        <div className="text-xs text-gray-500 truncate">{user?.email}</div>
-        <div className={cn(
-          "mt-1 text-xs inline-flex items-center px-2 py-1 rounded-full font-medium",
-          roleInfo.className
-        )}>
-          {roleInfo.icon}
-          {roleInfo.label}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -422,10 +257,54 @@ export default function Layout() {
             <div className={`p-5 border-b transition-all duration-300 ${isSidebarCollapsed ? 'p-3 flex justify-center' : ''}`}>
               {user ? (
                 <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
-                  <div className="w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold flex-shrink-0">
+                  <div className="relative w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold flex-shrink-0">
                     {user.username ? user.username.charAt(0).toUpperCase() : '?'}
+                    {isSidebarCollapsed && (
+                      <div className={cn(
+                        "absolute -bottom-1 -right-1 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border",
+                        user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
+                        user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 border-amber-300" :
+                        "bg-blue-100 text-blue-700 border-blue-200"
+                      )}>
+                        {user.role === 'admin' ? (
+                          <Settings className="h-3 w-3" />
+                        ) : user.role === 'lead_student' ? (
+                          <Crown className="h-3 w-3" />
+                        ) : (
+                          <BookOpen className="h-3 w-3" />
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {!isSidebarCollapsed && renderUserInfo()}
+                  {!isSidebarCollapsed && (
+                    <div>
+                      <div className="font-medium">{user.username}</div>
+                      <div className="text-sm text-muted-foreground">{user.email}</div>
+                      <div className={cn(
+                        "text-xs flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-full font-semibold shadow-sm border",
+                        user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
+                        user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800 border-amber-300" :
+                        "bg-blue-100 text-blue-700 border-blue-200"
+                      )}>
+                        {user.role === 'admin' ? (
+                          <>
+                            <Settings className="h-3.5 w-3.5" />
+                            <span>Administrator</span>
+                          </>
+                        ) : user.role === 'lead_student' ? (
+                          <>
+                            <Crown className="h-4 w-4 text-amber-600" />
+                            <span>Lead Student</span>
+                          </>
+                        ) : (
+                          <>
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>Student</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
@@ -455,18 +334,15 @@ export default function Layout() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-9 w-9 relative ${activeLesson ? 'bg-green-50 text-green-600 hover:bg-green-100' : ''}`}
+                      className={`h-9 w-9 relative`}
                       onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
                     >
                       <BookOpen className="h-5 w-5" />
-                      {activeLesson && (
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-                      )}
                     </Button>
                   </div>
                 ) : (
                   <Collapsible open={isCurriculumOpen} onOpenChange={setIsCurriculumOpen} className="flex-shrink-0">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2 text-gray-900 transition-all hover:bg-gray-200 font-bold text-base rounded-lg">
+                    <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2 text-gray-800 transition-all hover:bg-gray-200 font-bold text-base rounded-lg">
                       <div className="flex items-center space-x-3">
                         <BookOpen className="h-5 w-5" />
                         <span>Curriculum</span>
@@ -488,8 +364,10 @@ export default function Layout() {
                             open={openCourses.includes(course.id)}
                             onOpenChange={() => toggleCourse(course.id)}
                           >
-                            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium">
-                              <span>{course.name}</span>
+                            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
+                              <div className="flex items-center gap-2">
+                                <span>{course.name}</span>
+                              </div>
                               <ChevronDown className={cn(
                                 "h-4 w-4 transition-transform duration-200",
                                 openCourses.includes(course.id) && "transform rotate-180"
@@ -503,8 +381,10 @@ export default function Layout() {
                                     open={openWeeks.includes(week.id)}
                                     onOpenChange={() => toggleWeek(week.id)}
                                   >
-                                    <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-600 hover:bg-gray-200 rounded-lg font-medium">
-                                      <span>{week.name}</span>
+                                    <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
+                                      <div className="flex items-center gap-2">
+                                        <span>{week.name}</span>
+                                      </div>
                                       <ChevronDown className={cn(
                                         "h-4 w-4 transition-transform duration-200",
                                         openWeeks.includes(week.id) && "transform rotate-180"
@@ -543,7 +423,7 @@ export default function Layout() {
                   
                   {/* Admin link - only show for admin users */}
                   {user?.role === 'admin' && (
-                    <NavItem to="/admin" icon={Crown} collapsed={isSidebarCollapsed}>
+                    <NavItem to="/admin" icon={Settings} collapsed={isSidebarCollapsed}>
                       Admin
                     </NavItem>
                   )}
@@ -566,127 +446,14 @@ export default function Layout() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 min-h-screen bg-gray-50">
+        <div className="flex-1 min-h-screen">
           <div className="h-full flex flex-col">
-            {activeLesson ? (
-              <div className="flex-1 h-screen overflow-hidden">
-                <LessonChatbot lessonId={activeLesson.id} lessonTitle={activeLesson.name} />
-              </div>
-            ) : (
-              <div className="container mx-auto p-6">
-                <Outlet />
-              </div>
-            )}
+            <div className="w-full">
+              <Outlet />
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Duration Selection Dialog */}
-      <Dialog open={showDurationDialog} onOpenChange={setShowDurationDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-xl text-amber-900">
-              {user?.role === 'lead_student' ? 'Select Lesson Duration' : '👑 Waiting for Lead Student'}
-            </DialogTitle>
-          </DialogHeader>
-          {user?.role === 'lead_student' ? (
-            <>
-              <div className="p-4 space-y-4">
-                <div className="bg-white p-4 rounded-lg border border-amber-200/50 shadow-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-full bg-amber-50">
-                      <Crown className="h-5 w-5 text-amber-700" />
-                    </div>
-                    <p className="text-base text-amber-900 font-medium">
-                      Lead Student Controls
-                    </p>
-                  </div>
-                  <p className="text-sm text-amber-800/80 mb-4">
-                    As the lead student, you have the authority to manage this lesson's duration. Choose wisely!
-                  </p>
-                  <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                    <SelectTrigger className="border-amber-100 bg-white text-amber-900 hover:border-amber-200 transition-colors">
-                      <SelectValue placeholder="Select duration in minutes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">1 minute</SelectItem>
-                      <SelectItem value="5">5 minutes</SelectItem>
-                      <SelectItem value="10">10 minutes</SelectItem>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="20">20 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter className="bg-gray-50 px-4 py-3 border-t border-gray-100">
-                <Button
-                  onClick={() => {
-                    setShowDurationDialog(false);
-                    setSelectedDuration("");
-                    setSelectedLessonToStart(null);
-                  }}
-                  variant="outline"
-                  className="border-gray-200 text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={startLesson}
-                  disabled={!selectedDuration}
-                  className="bg-amber-600 text-white hover:bg-amber-700 shadow-sm transition-colors"
-                >
-                  Start Lesson
-                </Button>
-              </DialogFooter>
-            </>
-          ) : (
-            <div className="p-4 space-y-4">
-              <div className="text-center">
-                <div className="relative w-16 h-16 mx-auto mb-4">
-                  <div className="absolute inset-0 rounded-full border-4 border-gray-100"></div>
-                  <div className="absolute inset-0 rounded-full border-4 border-amber-500/30 border-t-transparent animate-spin"></div>
-                  <Clock className="h-8 w-8 absolute inset-0 m-auto text-amber-700/70" />
-                </div>
-                <p className="text-lg font-semibold text-amber-900">
-                  Waiting for Lead Student
-                </p>
-                <p className="text-sm text-amber-800/70 mt-2">
-                  Only the lead student can start this lesson. Please wait for them to begin.
-                </p>
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={() => {
-                    setShowDurationDialog(false);
-                    setSelectedLessonToStart(null);
-                  }}
-                  variant="outline"
-                  className="border-gray-200 text-gray-700 hover:bg-gray-50"
-                >
-                  Close
-                </Button>
-              </DialogFooter>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Start Notification Dialog */}
-      <NotificationDialog
-        type="start"
-        data={notificationData}
-        open={showNotification}
-        onOpenChange={setShowNotification}
-      />
-
-      {/* End Notification Dialog */}
-      <NotificationDialog
-        type="end"
-        data={endNotificationData}
-        open={showEndNotification}
-        onOpenChange={setShowEndNotification}
-      />
     </div>
   );
 }

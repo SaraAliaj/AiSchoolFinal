@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, Bot, User, Loader2, BrainCircuit, Clock, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Message {
   id: string;
@@ -13,10 +14,11 @@ interface Message {
 }
 
 export default function Chat() {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "👋 Hi! I'm your AI assistant, ready to help you learn and grow. How can I assist you today?",
+      content: `👋 Hi ${user?.username || 'there'}! I'm your AI assistant, ready to help you learn and grow. How can I assist you today?`,
       sender: 'ai',
       timestamp: new Date()
     }
@@ -149,24 +151,24 @@ export default function Chat() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] w-full mx-auto bg-gray-50">
-      <div className="h-full bg-white shadow-lg overflow-hidden flex flex-col mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl">
+    <div className="h-screen w-full">
+      <div className="h-full bg-white flex flex-col">
         {/* Chat header */}
-        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
-              <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+        <div className="px-6 py-4 border-b bg-white flex items-center">
+          <div className="flex items-center gap-4">
+            <div className="h-11 w-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
+              <BrainCircuit className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800 text-base sm:text-lg">General AI Assistant</h3>
+              <h3 className="font-semibold text-slate-800 text-lg">General AI Assistant</h3>
               <p className="text-xs text-slate-500">Powered by advanced AI technology</p>
             </div>
           </div>
         </div>
 
         {/* Messages area */}
-        <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 10rem)' }}>
-          <div className="space-y-6 w-full max-w-[95%] mx-auto py-4 sm:py-6 px-3 sm:px-4">
+        <ScrollArea className="flex-1">
+          <div className="space-y-6 w-full px-6 py-6">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -225,19 +227,19 @@ export default function Chat() {
         </ScrollArea>
 
         {/* Input area */}
-        <div className="p-3 sm:p-4 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3 items-center">
+        <div className="px-6 py-4 border-t bg-white">
+          <form onSubmit={handleSubmit} className="flex gap-3 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me anything..."
               disabled={isLoading}
-              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 h-11 sm:h-12 px-4 rounded-full shadow-sm hover:shadow-md transition-all duration-200"
+              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white h-12 px-4 rounded-full shadow-sm hover:shadow-md transition-all duration-200"
             />
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-full h-11 w-11 sm:h-12 sm:w-12 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-full h-12 w-12 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
             >
               {isLoading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
