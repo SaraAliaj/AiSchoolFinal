@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Bot, User, Loader2, BrainCircuit, Clock, MessageSquare, Sparkles } from "lucide-react";
+import { Send, Bot, User, Loader2, BrainCircuit, Clock, MessageSquare } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 interface Message {
@@ -16,7 +16,7 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hello! I'm your AI assistant powered by Grok. I'm here to help you with anything - from coding and science to creative writing and general knowledge. Ask me anything! 🚀",
+      content: "👋 Hi! I'm your AI assistant, ready to help you learn and grow. How can I assist you today?",
       sender: 'ai',
       timestamp: new Date()
     }
@@ -149,57 +149,57 @@ export default function Chat() {
   };
 
   return (
-    <div className="h-screen max-w-[90rem] mx-auto p-8">
-      <div className="h-full bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col">
+    <div className="h-[calc(100vh-4rem)] w-full mx-auto bg-gray-50">
+      <div className="h-full bg-white shadow-lg overflow-hidden flex flex-col mx-auto max-w-5xl lg:max-w-6xl xl:max-w-7xl">
         {/* Chat header */}
-        <div className="px-10 py-8 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
-              <Sparkles className="h-9 w-9 text-primary" />
+        <div className="px-4 sm:px-6 py-4 sm:py-5 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
+              <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800 text-2xl">Grok AI Assistant</h3>
-              <p className="text-sm text-slate-500">Powered by advanced AI technology</p>
+              <h3 className="font-semibold text-slate-800 text-base sm:text-lg">General AI Assistant</h3>
+              <p className="text-xs text-slate-500">Powered by advanced AI technology</p>
             </div>
           </div>
         </div>
 
         {/* Messages area */}
-        <ScrollArea className="flex-1 px-10 py-10 bg-gradient-to-b from-slate-50/50 to-white/30">
-          <div className="space-y-10 max-w-[90%] mx-auto">
+        <ScrollArea className="flex-1" style={{ height: 'calc(100vh - 10rem)' }}>
+          <div className="space-y-6 w-full max-w-[95%] mx-auto py-4 sm:py-6 px-3 sm:px-4">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start gap-4 ${
+                className={`flex items-start gap-3 sm:gap-4 ${
                   message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
                 {message.sender === 'user' ? (
-                  <Avatar className="h-12 w-12 border-2 border-primary/10 shadow-sm">
-                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary text-sm">
-                      <User className="h-6 w-6" />
+                  <Avatar className="h-8 w-8 sm:h-9 sm:w-9 border-2 border-primary/10 shadow-sm rounded-full">
+                    <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary text-xs rounded-full">
+                      <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
-                    <Sparkles className="h-7 w-7 text-primary" />
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                    <BrainCircuit className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                   </div>
                 )}
                 
-                <div className={`space-y-2 max-w-[85%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className="max-w-[85%] sm:max-w-[90%]">
                   <div
-                    className={`rounded-2xl px-8 py-4 shadow-sm transition-all duration-200 ${
+                    className={`rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-sm transition-all duration-200 ${
                       message.sender === 'user'
                         ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-tr-none'
                         : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-md'
                     }`}
                   >
-                    <p className={`text-lg whitespace-pre-line leading-relaxed ${message.sender === 'ai' ? 'text-gray-700 font-semibold' : ''}`}>
+                    <p className={`text-sm whitespace-pre-line leading-relaxed ${message.sender === 'ai' ? 'text-gray-700 font-semibold' : ''}`}>
                       {message.content}
                     </p>
                   </div>
-                  <p className="text-sm text-slate-400 px-2 flex items-center">
-                    <Clock className="h-4 w-4 mr-1.5 opacity-70" />
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 px-2 flex items-center">
+                    <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1 opacity-70" />
                     {formatTime(message.timestamp)}
                   </p>
                 </div>
@@ -208,49 +208,41 @@ export default function Chat() {
             
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex items-start gap-4">
-                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
-                  <Sparkles className="h-7 w-7 text-primary" />
+              <div className="flex items-start gap-3 sm:gap-4">
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                  <BrainCircuit className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
-                
-                <div className="space-y-2 max-w-[85%]">
-                  <div className="rounded-2xl rounded-tl-none px-8 py-5 bg-white border border-slate-200 shadow-sm">
-                    <div className="flex items-center">
-                      <div className="flex space-x-2">
-                        <div className="w-3 h-3 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '0ms' }}></div>
-                        <div className="w-3 h-3 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '300ms' }}></div>
-                        <div className="w-3 h-3 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '600ms' }}></div>
-                      </div>
-                      <span className="ml-4 text-base text-slate-400">Thinking about your request...</span>
-                    </div>
+                <div className="rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-tl-none shadow-sm">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                    <span className="text-sm text-slate-500 font-medium">Thinking...</span>
                   </div>
                 </div>
               </div>
             )}
-            
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
 
         {/* Input area */}
-        <div className="p-8 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="flex gap-4 items-center max-w-[90%] mx-auto">
+        <div className="p-3 sm:p-4 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm">
+          <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask me anything..."
               disabled={isLoading}
-              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 py-8 px-8 text-lg rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 h-11 sm:h-12 px-4 rounded-full shadow-sm hover:shadow-md transition-all duration-200"
             />
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-xl h-16 w-16 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-full h-11 w-11 sm:h-12 sm:w-12 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
             >
               {isLoading ? (
-                <Loader2 className="h-7 w-7 animate-spin" />
+                <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
-                <Send className="h-7 w-7" />
+                <Send className="h-5 w-5" />
               )}
             </Button>
           </form>
