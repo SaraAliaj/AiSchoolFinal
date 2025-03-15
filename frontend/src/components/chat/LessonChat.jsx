@@ -52,18 +52,13 @@ const LessonChat = () => {
     );
   }
 
-  const isDeepLearningLesson = lesson && 
-    (lesson.title?.toLowerCase().includes('deep learning') || 
-     lesson.description?.toLowerCase().includes('deep learning') ||
-     lesson.weekNumber === 1 && lesson.dayOfWeek === 'Thursday');
-
   return (
     <div className="flex h-[calc(100vh-5rem)]">
       {/* PDF Viewer */}
       <div className="w-1/2 border-r p-4 h-full overflow-auto">
         <SimplePDFViewer 
           lessonId={lessonId}
-          title={lesson?.title || 'Deep Learning Lesson'} 
+          title={lesson?.title || 'Lesson'} 
         />
       </div>
 
@@ -73,21 +68,14 @@ const LessonChat = () => {
           <CardHeader className="border-b bg-muted/40">
             <CardTitle className="flex items-center">
               <Sparkles className="h-5 w-5 mr-2 text-primary" />
-              {isDeepLearningLesson ? 'AI Learning Assistant' : 'Lesson Chat'}
+              AI Learning Assistant
               {lesson && <span className="text-sm text-muted-foreground ml-2">
                 - {lesson.title || `Week ${lesson.weekNumber}, ${lesson.dayOfWeek}`}
               </span>}
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 h-[calc(100%-4rem)]">
-            {isDeepLearningLesson ? (
-              <ChatBot lessonId={lessonId} />
-            ) : (
-              <div className="p-6 text-center text-muted-foreground">
-                <p>The AI assistant is only available for the Deep Learning lesson.</p>
-                <p className="mt-2">Please select the Thursday Week 1 Deep Learning lesson to chat with the AI.</p>
-              </div>
-            )}
+            <ChatBot lessonId={lessonId} />
           </CardContent>
         </Card>
       </div>

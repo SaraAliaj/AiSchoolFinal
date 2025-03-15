@@ -94,47 +94,23 @@ export default function LessonChatbot({
 
   // Initialize WebSocket connection
   useEffect(() => {
-    // Try to connect to multiple possible ports
-    const tryConnect = (ports = [8080, 8081, 8082]) => {
-      if (ports.length === 0) {
-        toast({
-          title: "Connection Error",
-          description: "Failed to connect to any WebSocket server. Please ensure the server is running.",
-          variant: "destructive",
-        });
-        return;
-      }
+    const tryConnect = () => {
+      console.log('Connecting to WebSocket server...');
       
-      const port = ports[0];
-      console.log(`Trying to connect to WebSocket server on port ${port}...`);
-      
-      // Create WebSocket connection
-      const ws = new WebSocket(`ws://localhost:${port}`);
-      
-      let connected = false;
+      const ws = new WebSocket('ws://localhost:8080');
       
       ws.onopen = () => {
-        if (!connected) {
-          connected = true;
-          console.log(`Connected to WebSocket server on port ${port}`);
-          socketRef.current = ws;
-          // Don't send any initial message here
-        }
+        console.log('Connected to WebSocket server');
+        socketRef.current = ws;
       };
       
       ws.onmessage = (event) => {
         console.log('Message from server:', event.data);
         try {
-          // Try to parse the response as JSON
-          const jsonData = JSON.parse(event.data) as { 
-            response?: string; 
-            error?: string; 
-            content?: LessonContent;
-            type?: string;
-          };
+          const jsonData = JSON.parse(event.data);
           
-          // Check if there's an error
           if (jsonData.error) {
+            console.error('Server error:', jsonData.error);
             toast({
               title: "Error",
               description: jsonData.error,
@@ -144,12 +120,6 @@ export default function LessonChatbot({
             return;
           }
 
-          // Handle lesson content if present
-          if (jsonData.content && jsonData.type === 'lesson_content') {
-            setLessonContent(jsonData.content as LessonContent);
-          }
-          
-          // Only add AI response if it's not a connection message
           if (jsonData.response && !jsonData.response.includes("Connected to")) {
             const aiMessage: Message = {
               id: Date.now().toString(),
@@ -160,7 +130,7 @@ export default function LessonChatbot({
             setMessages(prev => [...prev, aiMessage]);
           }
         } catch (e) {
-          // If not JSON and not a connection message, treat as plain text
+          console.error('Error parsing server response:', e);
           if (!event.data.includes("Connected to")) {
             const aiMessage: Message = {
               id: Date.now().toString(),
@@ -175,39 +145,32 @@ export default function LessonChatbot({
       };
       
       ws.onerror = (error) => {
-        console.error(`WebSocket error on port ${port}:`, error);
-        if (!connected) {
-          // If we couldn't connect, try the next port
-          tryConnect(ports.slice(1));
-        } else {
-          toast({
-            title: "Connection Error",
-            description: "WebSocket connection error. Please refresh the page.",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-        }
+        console.error('WebSocket error:', error);
+        toast({
+          title: "Connection Error",
+          description: "WebSocket connection error. Please ensure the server is running and refresh the page.",
+          variant: "destructive",
+        });
+        setIsLoading(false);
       };
       
       ws.onclose = () => {
         console.log('WebSocket connection closed');
-        if (connected) {
-          // Only try to reconnect if we were previously connected
-          setTimeout(() => {
-            toast({
-              title: "Reconnecting",
-              description: "Attempting to reconnect to the server...",
-            });
-            tryConnect([8080, 8081, 8082]);
-          }, 3000);
-        }
+        socketRef.current = null;
+        setTimeout(() => {
+          toast({
+            title: "Reconnecting",
+            description: "Attempting to reconnect to the server...",
+          });
+          tryConnect();
+        }, 3000);
       };
+
+      return ws;
     };
     
-    // Start connection attempts with all potential ports
-    tryConnect([8080, 8081, 8082]);
+    const ws = tryConnect();
     
-    // Clean up on unmount
     return () => {
       if (socketRef.current) {
         socketRef.current.close();
@@ -269,7 +232,7 @@ export default function LessonChatbot({
 
     const userMessage: Message = {
       id: Date.now().toString(),
-      content: input,
+      content: input.trim(),
       sender: 'user',
       timestamp: new Date()
     };
@@ -279,27 +242,19 @@ export default function LessonChatbot({
     setIsLoading(true);
 
     try {
-      // Send message to WebSocket server
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        // Format: lessonId|question
-        socketRef.current.send(`${lessonId}|${input}`);
+        socketRef.current.send(input.trim());
       } else {
         throw new Error('WebSocket connection not available');
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message. Please try again.",
+        variant: "destructive",
+      });
       setIsLoading(false);
-      
-      // Fallback to simulated response if WebSocket fails
-      setTimeout(() => {
-        const aiMessage: Message = {
-          id: Date.now().toString(),
-          content: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
-          sender: 'ai',
-          timestamp: new Date()
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      }, 1000);
     }
   };
 
