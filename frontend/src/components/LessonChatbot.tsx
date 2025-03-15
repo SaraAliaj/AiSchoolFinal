@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, User, FileText, Loader2, BookOpen, MessageSquare, FileIcon, Download, ChevronLeft, ChevronRight, BrainCircuit, Clock, Sparkles } from "lucide-react";
+import { Send, User, FileText, Loader2, BookOpen, MessageSquare, FileIcon, Download, ChevronLeft, ChevronRight, BrainCircuit, Clock, Sparkles, Bookmark } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { api } from "@/server/api";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface LessonContent {
   id: string;
@@ -72,10 +73,11 @@ export default function LessonChatbot({
   lessonId,
   lessonTitle
 }: LessonChatbotProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: `Hi there! 🤖 Ready to chat?`,
+      content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – your intelligent assistant from Albania! We empower the government to work more efficiently, optimize resources, and provide better services to citizens. Let's shape a more connected and tech-driven future for our beautiful country together! 🚀 ❤️⚫️`,
       sender: 'ai',
       timestamp: new Date()
     }
@@ -326,21 +328,112 @@ export default function LessonChatbot({
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Helper function to format message content by removing special characters
+  const formatTextContent = (text: string) => {
+    if (!text) return "";
+    
+    // Remove markdown asterisks for bold/italic
+    let formattedText = text.replace(/\*\*(.*?)\*\*/g, '$1');
+    formattedText = formattedText.replace(/\*(.*?)\*/g, '$1');
+    
+    return formattedText;
+  };
+
   const renderStructuredMessage = (message: Message) => {
     const content = message.content;
     const isUserMessage = message.sender === 'user';
     
     if (typeof content === 'string') {
-      // Format plain text messages with proper line breaks and make AI messages bold
-      return <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700 font-semibold'} whitespace-pre-line`}>{content}</p>;
+      // Check if content has structure (like bullet points or numbers)
+      if (content.includes('\n- ') || 
+          content.includes('\n• ') || 
+          content.includes('\n* ') || 
+          /\n\d+\.\s/.test(content)) {
+        
+        // Split by newlines
+        const lines = content.split('\n');
+        let currentSection: { heading?: string; content: string[] } = { content: [] };
+        const sections: { heading?: string; content: string[] }[] = [];
+        
+        lines.forEach(line => {
+          // Clean the line
+          const cleanLine = formatTextContent(line.trim());
+          
+          if (!cleanLine) return;
+          
+          // Check if line looks like a heading (ends with : or is all caps)
+          if ((cleanLine.endsWith(':') && cleanLine.length < 50) || 
+              (cleanLine === cleanLine.toUpperCase() && cleanLine.length > 3 && cleanLine.length < 30)) {
+            // Save previous section if it has content
+            if (currentSection.content.length > 0) {
+              sections.push(currentSection);
+            }
+            
+            // Start new section
+            currentSection = {
+              heading: cleanLine.endsWith(':') ? cleanLine.slice(0, -1) : cleanLine,
+              content: []
+            };
+          } 
+          // Check if line is a bullet point or numbered item
+          else if (cleanLine.startsWith('- ') || cleanLine.startsWith('• ') || 
+                   cleanLine.startsWith('* ') || /^\d+\.\s/.test(cleanLine)) {
+            // Get the text after the bullet or number
+            const itemText = cleanLine.replace(/^-\s|^•\s|^\*\s|^\d+\.\s/, '');
+            currentSection.content.push(itemText);
+          } 
+          // Regular line
+          else {
+            currentSection.content.push(cleanLine);
+          }
+        });
+        
+        // Add final section if it has content
+        if (currentSection.content.length > 0) {
+          sections.push(currentSection);
+        }
+        
+        // Render structured content
+        return (
+          <div className="space-y-3">
+            {sections.map((section, index) => (
+              <div key={index} className={section.heading ? "mb-4" : ""}>
+                {section.heading && (
+                  <h4 className={`font-bold mb-2 ${isUserMessage ? 'text-primary-foreground' : 'text-primary'} flex items-center`}>
+                    {section.heading.includes('Summary') && <BookOpen className="h-4 w-4 mr-2" />}
+                    {section.heading.includes('Key Point') && <Sparkles className="h-4 w-4 mr-2" />}
+                    {section.heading.includes('Question') && <MessageSquare className="h-4 w-4 mr-2" />}
+                    {section.heading}
+                  </h4>
+                )}
+                <div className="space-y-1">
+                  {section.content.map((item, i) => (
+                    <p key={i} className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} leading-relaxed mb-1`}>
+                      {item}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      }
+      
+      // For simple text, just format and render normally
+      return (
+        <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} whitespace-pre-line leading-relaxed`}>
+          {formatTextContent(content)}
+        </p>
+      );
     }
 
+    // For structured content types
     switch (content.type) {
       case 'structured_summary':
         return (
           <div className="space-y-4">
             {content.title && (
-              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{content.title}</h3>
+              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{formatTextContent(content.title)}</h3>
             )}
             {content.sections?.map((section, index) => (
               <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm">
@@ -350,16 +443,16 @@ export default function LessonChatbot({
                   {section.heading === 'Related Topics' && <BrainCircuit className="h-4 w-4 mr-2" />}
                   {section.heading}
                 </h4>
-                <div className="text-sm text-gray-700 font-semibold leading-relaxed">
+                <div className="text-sm text-gray-700 leading-relaxed">
                   {Array.isArray(section.content) ? (
                     <ul className="space-y-2">
                       {section.content.map((item, i) => (
-                        <li key={i} className="pl-2 border-l-2 border-gray-300 ml-2">{item}</li>
+                        <li key={i} className="pl-2 border-l-2 border-gray-300 ml-2">{formatTextContent(item)}</li>
                       ))}
                     </ul>
                   ) : (
                     section.content.split('\n').map((line, i) => (
-                      line.trim() ? <p key={i} className="mb-2">{line}</p> : null
+                      line.trim() ? <p key={i} className="mb-2">{formatTextContent(line)}</p> : null
                     ))
                   )}
                 </div>
@@ -376,17 +469,17 @@ export default function LessonChatbot({
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Question
               </h4>
-              <p className="text-sm text-gray-700 font-medium">{content.question}</p>
+              <p className="text-sm text-gray-700 font-medium">{formatTextContent(content.question || '')}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
               <h4 className="font-bold text-green-600 mb-2 flex items-center">
                 <Sparkles className="h-4 w-4 mr-2" />
                 Answer
               </h4>
-              <div className="text-sm text-gray-700 font-semibold leading-relaxed">
+              <div className="text-sm text-gray-700 leading-relaxed">
                 {content.answer?.split('\n').map((line, i) => (
                   line.trim() ? (
-                    <p key={i} className="mb-2">{line}</p>
+                    <p key={i} className="mb-2">{formatTextContent(line)}</p>
                   ) : null
                 ))}
               </div>
@@ -399,8 +492,8 @@ export default function LessonChatbot({
                 </h4>
                 <ul className="space-y-2">
                   {content.examples.map((example, i) => (
-                    <li key={i} className="text-sm text-gray-700 font-semibold leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
-                      {example}
+                    <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
+                      {formatTextContent(example)}
                     </li>
                   ))}
                 </ul>
@@ -408,14 +501,14 @@ export default function LessonChatbot({
             )}
             {content.references && content.references.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-amber-400 shadow-sm">
-                <h4 className="font-medium text-amber-600 mb-2 flex items-center">
-                  <BookOpen className="h-4 w-4 mr-2" />
+                <h4 className="font-bold text-amber-500 mb-2 flex items-center">
+                  <Bookmark className="h-4 w-4 mr-2" />
                   References
                 </h4>
                 <ul className="space-y-2">
-                  {content.references.map((ref, i) => (
+                  {content.references.map((reference, i) => (
                     <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-amber-200 ml-2">
-                      {ref}
+                      {formatTextContent(reference)}
                     </li>
                   ))}
                 </ul>
@@ -428,7 +521,7 @@ export default function LessonChatbot({
         return (
           <div className="space-y-4">
             {content.title && (
-              <h3 className="text-lg font-semibold text-primary border-b pb-2 mb-3">{content.title}</h3>
+              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{formatTextContent(content.title)}</h3>
             )}
             {content.sections?.map((section, index) => (
               <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm mb-3">
@@ -436,13 +529,13 @@ export default function LessonChatbot({
                   {section.heading === 'Response' && <MessageSquare className="h-4 w-4 mr-2" />}
                   {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
                   {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
-                  {section.heading}
+                  {formatTextContent(section.heading)}
                 </h4>
                 {Array.isArray(section.content) ? (
                   <ul className="space-y-2">
                     {section.content.map((item, i) => (
                       <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
-                        {item}
+                        {formatTextContent(item)}
                       </li>
                     ))}
                   </ul>
@@ -451,7 +544,7 @@ export default function LessonChatbot({
                     {/* Split text by line breaks and render each line separately */}
                     {section.content.split('\n').map((line, i) => (
                       line.trim() ? (
-                        <p key={i} className="mb-2">{line}</p>
+                        <p key={i} className="mb-2">{formatTextContent(line)}</p>
                       ) : null
                     ))}
                   </div>
@@ -464,12 +557,12 @@ export default function LessonChatbot({
       case 'error':
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-600">{content.errorMessage || 'An error occurred'}</p>
+            <p className="text-sm text-red-600">{formatTextContent(content.errorMessage || 'An error occurred')}</p>
           </div>
         );
 
       default:
-        return <p className="text-sm text-gray-700">{JSON.stringify(content)}</p>;
+        return <p className="text-sm text-gray-700">{formatTextContent(JSON.stringify(content))}</p>;
     }
   };
 
@@ -512,8 +605,8 @@ export default function LessonChatbot({
               <BrainCircuit className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h3 className="font-semibold text-slate-800 text-lg">AI Learning Assistant</h3>
-              <p className="text-xs text-slate-500">Powered by advanced AI</p>
+              <h3 className="font-semibold text-slate-800 text-lg">Alba</h3>
+              <p className="text-xs text-slate-500">Smarter Conversations, Smarter Solutions</p>
             </div>
           </div>
         </div>

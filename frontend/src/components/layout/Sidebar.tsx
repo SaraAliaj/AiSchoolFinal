@@ -80,7 +80,7 @@ export default function Sidebar() {
         <Link to="/" className="flex items-center space-x-2">
           <GraduationCap className={`h-6 w-6 ${collapsed ? 'mx-auto' : ''}`} />
           <span className={`font-bold text-xl transition-opacity duration-300 ${collapsed ? 'opacity-0 w-0' : 'opacity-100'}`}>
-            AI School
+            AI Academia
           </span>
         </Link>
         <button 

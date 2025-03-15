@@ -40,9 +40,10 @@ const Sidebar = () => {
             {/* Logo and brand */}
             <div className="logo-container">
                 <div className="brand-logo">
-                    <img src="/favicon.svg" alt="AI School" className="brain-icon" />
-                    {!collapsed && <span className="brand-name">AI School</span>}
+                    <img src="/favicon.svg" alt="AI Academia" className="brain-icon" />
+                    {!collapsed && <span className="brand-name">AI Academia</span>}
                 </div>
+                {!collapsed && <p className="brand-tagline">The Tirana school of AI where we make the government of Albania more efficient</p>}
             </div>
             
             {/* User profile section */}

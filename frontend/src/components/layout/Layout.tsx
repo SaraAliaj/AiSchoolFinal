@@ -244,10 +244,10 @@ export default function Layout() {
                 </div>
                 <div className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
                   <h1 className="text-2xl font-bold text-primary leading-tight">
-                    AI School
+                    AI Academia
                   </h1>
                   <p className="text-xs text-muted-foreground italic">
-                    Learn. Challenge. Grow.
+                    The Tirana school of AI where we make the government of Albania more efficient
                   </p>
                 </div>
               </div>

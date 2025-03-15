@@ -179,6 +179,40 @@
     display: none;
 }
 
+/* Brand logo and tagline styling */
+.logo-container {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.brand-logo {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.brain-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 10px;
+}
+
+.brand-name {
+    font-weight: bold;
+    font-size: 1.2rem;
+    color: #333;
+}
+
+.brand-tagline {
+    font-size: 0.7rem;
+    color: #666;
+    font-style: italic;
+    line-height: 1.2;
+    margin-top: 3px;
+    padding-left: 2px;
+}
+
 .toggle-btn {
     background-color: #007bff;
     color: white;

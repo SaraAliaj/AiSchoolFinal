@@ -111,10 +111,10 @@ export default function RegisterForm() {
           className="flex flex-col items-center mb-3"
         >
           <div className="flex items-center justify-center mb-1">
-            <img src="/favicon.svg" alt="AI School" className="h-10 w-10 text-[#333]" />
-            <h1 className="text-3xl font-bold ml-2 text-[#333]">AI School</h1>
+            <img src="/favicon.svg" alt="AI Academia" className="h-10 w-10 text-[#333]" />
+            <h1 className="text-3xl font-bold ml-2 text-[#333]">AI Academia</h1>
           </div>
-          <p className="text-[#666] italic text-sm">Learn. Challenge. Grow.</p>
+          <p className="text-[#666] italic text-sm">The Tirana school of AI where we make the government of Albania more efficient</p>
         </motion.div>
 
         <motion.div
@@ -247,7 +247,7 @@ export default function RegisterForm() {
           transition={{ duration: 0.5, delay: 0.4 }}
           className="mt-4 text-xs text-gray-500"
         >
-          © 2025 AI School. All rights reserved.
+          © 2025 AI Academia. All rights reserved.
         </motion.div>
       </div>
     </div>

@@ -22,13 +22,12 @@ export default function GroupChat() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Welcome to the AI School group chat! 👋",
+      content: "Welcome to the AI Academia group chat! 👋",
       sender: {
         id: 'system',
-        name: 'System',
-        avatar: '/system-avatar.png'
+        name: 'System'
       },
-      timestamp: new Date()
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
     }
   ]);
   const [input, setInput] = useState('');
@@ -71,7 +70,7 @@ export default function GroupChat() {
           <AvatarFallback>GC</AvatarFallback>
         </Avatar>
         <div>
-          <h2 className="font-semibold">AI School Group Chat</h2>
+          <h2 className="font-semibold">AI Academia Group Chat</h2>
           <p className="text-sm text-muted-foreground">
             {isTyping ? "Someone is typing..." : `${messages.length} messages`}
           </p>
