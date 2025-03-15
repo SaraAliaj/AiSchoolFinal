@@ -109,14 +109,15 @@ async def chat_endpoint(websocket: WebSocket):
     try:
         while True:
             try:
-                # Receive and parse message
+                # Receive message
                 data = await websocket.receive_text()
-                message_data = json.loads(data)
-                user_input = message_data.get("message", "").strip()
+                
+                # Process the message directly
+                user_input = data.strip()
                 
                 if not user_input:
                     await manager.send_message(
-                        json.dumps({"message": "Please send a non-empty message"}),
+                        json.dumps({"error": "Please send a non-empty message"}),
                         websocket
                     )
                     continue
@@ -126,7 +127,7 @@ async def chat_endpoint(websocket: WebSocket):
                 
                 # Send response back
                 await manager.send_message(
-                    json.dumps({"message": response}),
+                    json.dumps({"response": response}),
                     websocket
                 )
                 
