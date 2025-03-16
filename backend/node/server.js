@@ -554,19 +554,30 @@ app.get('/api/days', async (req, res) => {
 // New endpoint to fetch lessons
 app.get('/api/lessons', async (req, res) => {
   try {
+    // Modified query to include proper aliases for all fields and explicitly include the ID
     const [rows] = await promisePool.query(`
-      SELECT l.id, l.lesson_name as title, l.course_id, l.week_id, l.day_id, 
-             c.name as course_name, w.name as week_name, d.day_name as day_name
+      SELECT 
+        l.id, 
+        l.lesson_name as title, 
+        l.course_id, 
+        l.week_id, 
+        l.day_id, 
+        l.file_path,
+        c.name as course_name, 
+        w.name as week_name, 
+        d.day_name as day_name
       FROM lessons l
       JOIN courses c ON l.course_id = c.id
       JOIN weeks w ON l.week_id = w.id
       JOIN days d ON l.day_id = d.id
-      ORDER BY c.id, w.id, d.id
+      ORDER BY l.id ASC
     `);
     
     // Ensure we always return an array, even if the query returns null or undefined
     const lessons = Array.isArray(rows) ? rows : [];
-    console.log(`Returning ${lessons.length} lessons`);
+    
+    // Log each lesson ID for debugging
+    console.log(`Returning ${lessons.length} lessons with IDs:`, lessons.map(l => l.id).join(', '));
     
     // Set the content type explicitly and stringify the JSON
     res.setHeader('Content-Type', 'application/json');
@@ -583,6 +594,7 @@ app.get('/api/lessons', async (req, res) => {
 app.get('/api/lessons/:id/content', async (req, res) => {
   try {
     const lessonId = req.params.id;
+    console.log(`Fetching content for lesson ID: ${lessonId}`);
     
     // Get the lesson details including file path
     const [lessons] = await promisePool.query(
@@ -590,36 +602,73 @@ app.get('/api/lessons/:id/content', async (req, res) => {
       [lessonId]
     );
     
+    console.log(`Query result for lesson ${lessonId}:`, lessons.length > 0 ? 'Found' : 'Not found');
+    
     if (lessons.length === 0) {
+      console.log(`Lesson ${lessonId} not found in database`);
       return res.status(404).json({ error: 'Lesson not found' });
     }
     
     const lesson = lessons[0];
-    const filePath = lesson.file_path;
+    console.log(`Found lesson in database:`, {
+      id: lesson.id,
+      name: lesson.lesson_name,
+      file_path: lesson.file_path
+    });
     
-    // Check if file exists
-    if (!fs.existsSync(filePath)) {
+    const relativePath = lesson.file_path;
+    
+    // Resolve the relative path - check all possible locations
+    let resolvedPath;
+    let fileExists = false;
+    
+    // Try different path resolutions
+    const possiblePaths = [
+      // Option 1: Direct path as stored
+      relativePath,
+      // Option 2: Path relative to python downloads directory
+      path.join(process.cwd(), '..', 'python', relativePath),
+      // Option 3: Path relative to current directory
+      path.join(process.cwd(), relativePath),
+      // Option 4: Path relative to node directory
+      path.join(process.cwd(), '..', 'node', relativePath),
+    ];
+    
+    console.log('Trying to resolve file path...');
+    for (const testPath of possiblePaths) {
+      console.log(`Checking path: ${testPath}`);
+      if (fs.existsSync(testPath)) {
+        console.log(`✅ Found file at: ${testPath}`);
+        resolvedPath = testPath;
+        fileExists = true;
+        break;
+      }
+    }
+    
+    if (!fileExists) {
+      console.error(`❌ File not found for lesson ${lessonId}. Tried paths:`, possiblePaths);
       return res.status(404).json({ error: 'Lesson file not found' });
     }
     
     // For PDF files, return file info but not the content
-    if (filePath.toLowerCase().endsWith('.pdf')) {
+    if (resolvedPath.toLowerCase().endsWith('.pdf')) {
+      console.log(`Returning PDF file info for: ${resolvedPath}`);
       return res.json({
         id: lesson.id,
         title: lesson.lesson_name,
         fileType: 'pdf',
-        fileName: path.basename(filePath)
+        fileName: path.basename(resolvedPath)
       });
     }
     
     // For non-PDF files, return the content as before
-    const fileContent = fs.readFileSync(filePath, 'utf8');
+    const fileContent = fs.readFileSync(resolvedPath, 'utf8');
     res.json({
       id: lesson.id,
       title: lesson.lesson_name,
       content: fileContent,
-      fileType: path.extname(filePath).substring(1) || 'txt',
-      fileName: path.basename(filePath)
+      fileType: path.extname(resolvedPath).substring(1) || 'txt',
+      fileName: path.basename(resolvedPath)
     });
   } catch (error) {
     console.error('Error fetching lesson content:', error);
@@ -937,6 +986,7 @@ app.post('/api/lessons/pdf', (req, res) => {
 app.get('/api/lessons/:id/download', async (req, res) => {
   try {
     const lessonId = req.params.id;
+    console.log(`Attempting to download file for lesson ID: ${lessonId}`);
     
     const [lessons] = await promisePool.query(
       'SELECT * FROM lessons WHERE id = ?',
@@ -944,26 +994,44 @@ app.get('/api/lessons/:id/download', async (req, res) => {
     );
     
     if (lessons.length === 0) {
+      console.log(`Lesson ${lessonId} not found in database for download`);
       return res.status(404).json({ error: 'Lesson not found' });
     }
     
     const lesson = lessons[0];
     const relativePath = lesson.file_path;
+    console.log(`Found lesson for download: ${lesson.lesson_name}, path: ${relativePath}`);
     
-    // Resolve the relative path to an absolute path
-    // If the path starts with 'downloads/', it's a relative path in the Python backend
-    let absolutePath;
-    if (relativePath.startsWith('downloads/')) {
-      absolutePath = path.join(process.cwd(), '..', 'python', relativePath);
-    } else {
-      // For backward compatibility with existing absolute paths
-      absolutePath = relativePath;
+    // Resolve the relative path - check all possible locations
+    let resolvedPath;
+    let fileExists = false;
+    
+    // Try different path resolutions
+    const possiblePaths = [
+      // Option 1: Direct path as stored
+      relativePath,
+      // Option 2: Path relative to python downloads directory
+      path.join(process.cwd(), '..', 'python', relativePath),
+      // Option 3: Path relative to current directory
+      path.join(process.cwd(), relativePath),
+      // Option 4: Path relative to node directory
+      path.join(process.cwd(), '..', 'node', relativePath),
+    ];
+    
+    console.log('Trying to resolve file path for download...');
+    for (const testPath of possiblePaths) {
+      console.log(`Checking path: ${testPath}`);
+      if (fs.existsSync(testPath)) {
+        console.log(`✅ Found file for download at: ${testPath}`);
+        resolvedPath = testPath;
+        fileExists = true;
+        break;
+      }
     }
     
-    console.log(`Resolved file path: ${absolutePath}`);
-    
-    if (!fs.existsSync(absolutePath)) {
-      return res.status(404).json({ error: 'Lesson file not found', path: absolutePath });
+    if (!fileExists) {
+      console.error(`❌ File not found for download - lesson ${lessonId}. Tried paths:`, possiblePaths);
+      return res.status(404).json({ error: 'Lesson file not found for download' });
     }
 
     // Important: Set these headers to display PDF inline
@@ -971,10 +1039,11 @@ app.get('/api/lessons/:id/download', async (req, res) => {
     res.setHeader('Content-Disposition', 'inline');  // This is crucial - 'inline' instead of 'attachment'
     
     // Stream the file to the response
-    const fileStream = fs.createReadStream(absolutePath);
+    console.log(`Streaming file for download: ${resolvedPath}`);
+    const fileStream = fs.createReadStream(resolvedPath);
     fileStream.pipe(res);
   } catch (error) {
-    console.error('Error serving PDF:', error);
+    console.error('Error serving PDF for download:', error);
     res.status(500).json({ error: 'Failed to serve PDF' });
   }
 });
