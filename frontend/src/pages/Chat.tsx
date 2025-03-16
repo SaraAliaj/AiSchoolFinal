@@ -15,7 +15,7 @@ interface Message {
 }
 
 export default function Chat() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -111,38 +111,95 @@ export default function Chat() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMessage: Message = {
+    if (!isAuthenticated) {
+      const errorMessage: Message = {
+        id: Date.now().toString(),
+        content: 'You need to be logged in to use the chat. Please log in and try again.',
+        sender: 'ai',
+        timestamp: new Date()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+      return;
+    }
+
+    const newMessage: Message = {
       id: Date.now().toString(),
       content: input,
       sender: 'user',
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setMessages(prev => [...prev, newMessage]);
     setInput('');
     setIsLoading(true);
 
     try {
-      // Send message without lesson context
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        socketRef.current.send(JSON.stringify({
-          type: 'chat',
-          message: input
-        }));
+      const token = localStorage.getItem('authToken');
+      
+      // Check if the message is asking about a person
+      const messageLC = input.toLowerCase();
+      const isPersonQuery = messageLC.includes('about') || messageLC.includes('info') || messageLC.includes('who is');
+      
+      if (isPersonQuery) {
+        // Use the HTTP endpoint for personal information lookup
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ 
+            message: input,
+            type: 'personal_info_lookup'
+          })
+        });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            const errorMessage: Message = {
+              id: Date.now().toString(),
+              content: 'Your session has expired. Please refresh the page or log in again.',
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => [...prev, errorMessage]);
+            return;
+          }
+          throw new Error('Failed to get response');
+        }
+
+        const data = await response.json();
+        
+        const aiMessage: Message = {
+          id: Date.now().toString(),
+          content: data.response || 'Sorry, I could not find the requested information.',
+          sender: 'ai',
+          timestamp: new Date()
+        };
+
+        setMessages(prev => [...prev, aiMessage]);
       } else {
-        throw new Error('WebSocket connection not available');
+        // Use WebSocket for general chat
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({
+            message: input,
+            token: token
+          }));
+        } else {
+          throw new Error('WebSocket connection not available');
+        }
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
-      setIsLoading(false);
-      
+      console.error('Error:', error);
       const errorMessage: Message = {
         id: Date.now().toString(),
-        content: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
+        content: 'Sorry, I encountered an error while processing your request. Please try again.',
         sender: 'ai',
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -324,10 +381,10 @@ export default function Chat() {
               ))}
             </AnimatePresence>
             
-            {/* Loading indicator - modernized */}
+            {/* Loading indicator */}
             {isLoading && (
-              <motion.div 
-                initial={{ opacity: 0, y: 10 }}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="flex items-start gap-4"
               >
