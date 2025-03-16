@@ -22,7 +22,7 @@ const queryClient = new QueryClient();
 const AdminRoute = ({ children }) => {
   const { user } = useAuth();
   
-  if (!user || (user.role !== 'admin' && user.role !== 'lead_student')) {
+  if (!user || (user.role !== 'admin' && user.role !== 'student')) {
     return <Navigate to="/" replace />;
   }
   

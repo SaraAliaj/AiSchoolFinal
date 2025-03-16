@@ -82,10 +82,10 @@ export default function Admin() {
       return;
     }
 
-    if (user.role !== 'admin' && user.role !== 'lead_student') {
+    if (user.role !== 'admin' && user.role !== 'student') {
       toast({
         title: "Access Denied",
-        description: "You must be an admin or lead student to access this page.",
+        description: "You must be an admin or student to access this page.",
         variant: "destructive",
       });
       navigate('/');
@@ -105,8 +105,8 @@ export default function Admin() {
     );
   }
 
-  // If user is not admin or lead student, don't render the component
-  if (!user || (user.role !== 'admin' && user.role !== 'lead_student')) {
+  // If user is not admin or student, don't render the component
+  if (!user || (user.role !== 'admin' && user.role !== 'student')) {
     return null;
   }
 
