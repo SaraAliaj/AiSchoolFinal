@@ -105,5 +105,7 @@ export const createPool = () => {
 };
 
 // Default export is the pool
+// When using mysql2/promise, the pool is already promise-based
+// so we don't need to call .promise() on it
 const pool = createPool();
-export default pool.promise(); 
+export default pool; 
