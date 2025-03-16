@@ -458,8 +458,20 @@ const isAdmin = async (req, res, next) => {
       [req.user.userId]
     );
 
-    if (user.length === 0 || user[0].role !== 'admin') {
+    if (user.length === 0) {
       return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
+    }
+
+    // Check for 'admin' role case-insensitively
+    const userRole = user[0].role.toLowerCase();
+    if (userRole !== 'admin' && userRole !== 'administrator' && userRole !== 'adminastrator') {
+      return res.status(403).json({ message: 'Access denied. Admin privileges required.' });
+    }
+
+    // If we got here, update the role to standardized 'admin' if needed
+    if (user[0].role !== 'admin') {
+      console.log(`Standardizing user ${req.user.userId} role from '${user[0].role}' to 'admin'`);
+      await promisePool.query('UPDATE users SET role = ? WHERE id = ?', ['admin', req.user.userId]);
     }
 
     next();
@@ -1299,56 +1311,14 @@ setInterval(async () => {
 // Update the startServer function to use httpServer instead of app
 const startServer = async () => {
   try {
+    // Connect to the database
     await connectToDatabase();
-    await ensureTablesExist();
     
-    // Ensure admin roles are correctly set in database
+    // Ensure admin roles are set correctly
     await ensureAdminRoles();
     
-    // Add this line to clean up online status on server start
-    await cleanupOnlineStatus();
-    
-    // Use port 3000 for API server
-    const PORT = 3000;
-    const WEBSOCKET_PORT = 3001;
-
-    // Update CORS settings with the new port
-    app.use(cors({
-      origin: [
-        FRONTEND_URL,
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        `http://localhost:${PORT}`,
-        `http://127.0.0.1:${PORT}`
-      ],
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization']
-    }));
-
-    // Update Socket.IO CORS settings
-    io.attach(httpServer, {
-      cors: {
-        origin: [
-          FRONTEND_URL,
-          'http://localhost:5173',
-          'http://localhost:5174',
-          'http://127.0.0.1:5173',
-          'http://127.0.0.1:5174',
-          `http://localhost:${PORT}`,
-          `http://127.0.0.1:${PORT}`
-        ],
-        methods: ['GET', 'POST'],
-        credentials: true
-      }
-    });
-
-    httpServer.listen(PORT, () => {
-      console.log(`API server is running on port ${PORT}`);
-      console.log(`WebSocket server is running on port ${WEBSOCKET_PORT}`);
-    });
+    // Start the HTTP server
+    // ... existing code ...
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
