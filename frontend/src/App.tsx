@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import Admin from "@/pages/Admin";
 import LessonChat from "@/components/chat/LessonChat";
 import LessonPage from "@/pages/LessonPage";
+import PersonalInfoForm from "@/components/PersonalInfoForm";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
               <Route path="lessons" element={<Lessons />} />
               <Route path="lessons/:lessonId" element={<LessonPage />} />
               <Route path="lessons/:lessonId/chat" element={<LessonChat />} />
+              <Route path="personal-info" element={<PersonalInfoForm />} />
               <Route 
                 path="admin" 
                 element={

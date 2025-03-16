@@ -436,6 +436,16 @@ const api = {
       console.error('Failed to send chat message:', error);
       throw error;
     }
+  },
+
+  savePersonalInfo: async (section: string, data: any) => {
+    try {
+      const response = await axiosInstance.post('/personal-info', { section, data });
+      return response.data;
+    } catch (error) {
+      console.error('Failed to save personal info:', error);
+      throw error;
+    }
   }
 };
 export { api };

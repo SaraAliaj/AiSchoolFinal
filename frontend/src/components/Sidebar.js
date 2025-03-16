@@ -75,6 +75,12 @@ const Sidebar = () => {
                         {!collapsed && <span>Home</span>}
                     </Link>
                 </li>
+                <li>
+                    <Link to="/personal-info" className="menu-link">
+                        <i className="icon-user"></i>
+                        {!collapsed && <span>Personal Information</span>}
+                    </Link>
+                </li>
                 <li className={curriculumOpen ? 'active' : ''}>
                     <a href="#" className="menu-link" onClick={toggleCurriculum}>
                         <i className="icon-curriculum"></i>

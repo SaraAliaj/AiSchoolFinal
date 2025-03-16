@@ -20,7 +20,8 @@ import {
   Calendar,
   GraduationCap,
   BookOpenCheck,
-  Loader2
+  Loader2,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -333,6 +334,11 @@ export default function Layout() {
                 {/* Change from Home to General AI Chatbot and use Bot icon */}
                 <NavItem to="/chat" icon={Bot} collapsed={isSidebarCollapsed}>
                   General AI Chatbot
+                </NavItem>
+
+                {/* Personal Information */}
+                <NavItem to="/personal-info" icon={User} collapsed={isSidebarCollapsed}>
+                  Personal Information
                 </NavItem>
 
                 {/* Curriculum Dropdown */}
