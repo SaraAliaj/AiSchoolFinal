@@ -1,113 +1,101 @@
--- Check if users table exists and create if it doesn't
-CREATE TABLE IF NOT EXISTS users (
-    id            int auto_increment primary key,
-    name          varchar(255)                        not null,
-    active        tinyint(1)                          null,
-    role          varchar(255)                        not null,
-    email         varchar(100)                        not null,
-    password      varchar(255)                        not null,
-    created_at    datetime  default CURRENT_TIMESTAMP null,
-    last_activity timestamp default CURRENT_TIMESTAMP null on update CURRENT_TIMESTAMP,
-    constraint email
-        unique (email)
-);
+-- Create and use the database
+CREATE DATABASE IF NOT EXISTS aischool;
+USE aischool;
 
--- Add username and surname columns if they don't exist
-SET @dbname = DATABASE();
-SET @tablename = "users";
-SET @columnname = "username";
-SET @columnname2 = "surname";
-SET @preparedStatement = (SELECT IF(
-  (
-    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
-    WHERE
-      TABLE_SCHEMA = @dbname
-      AND TABLE_NAME = @tablename
-      AND COLUMN_NAME = @columnname
-  ) > 0,
-  "SELECT 1",
-  "ALTER TABLE users ADD COLUMN username VARCHAR(50), ADD COLUMN surname VARCHAR(255)"
-));
-PREPARE alterIfNotExists FROM @preparedStatement;
-EXECUTE alterIfNotExists;
-DEALLOCATE PREPARE alterIfNotExists;
+-- Set proper character encoding
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
--- Update existing records to split name into username and surname if needed
-UPDATE users 
-SET 
-    username = SUBSTRING_INDEX(name, ' ', 1),
-    surname = SUBSTRING_INDEX(name, ' ', -1)
-WHERE 
-    username IS NULL 
-    AND surname IS NULL 
-    AND name IS NOT NULL;
+-- Table: courses
+DROP TABLE IF EXISTS `courses`;
+CREATE TABLE `courses` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(100) NOT NULL,
+    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Add unique constraint for username if it doesn't exist
-SET @preparedStatement = (SELECT IF(
-  (
-    SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
-    WHERE
-      TABLE_SCHEMA = @dbname
-      AND TABLE_NAME = @tablename
-      AND CONSTRAINT_NAME = 'username'
-  ) > 0,
-  "SELECT 1",
-  "ALTER TABLE users ADD CONSTRAINT username UNIQUE (username)"
-));
-PREPARE alterIfNotExists FROM @preparedStatement;
-EXECUTE alterIfNotExists;
-DEALLOCATE PREPARE alterIfNotExists;
+-- Table: weeks
+DROP TABLE IF EXISTS `weeks`;
+CREATE TABLE `weeks` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `name` varchar(10) NOT NULL,
+    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
--- Create other tables
-CREATE TABLE IF NOT EXISTS courses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+-- Table: days
+DROP TABLE IF EXISTS `days`;
+CREATE TABLE `days` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `day_name` varchar(50) NOT NULL,
+    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS weeks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id INT NOT NULL,
-    week_number INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (course_id) REFERENCES courses(id)
-);
+-- Table: users
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `username` varchar(50) NOT NULL,
+    `surname` varchar(255) NOT NULL,
+    `active` tinyint(1) NULL DEFAULT 1,
+    `role` varchar(255) NOT NULL,
+    `email` varchar(100) NOT NULL,
+    `password` varchar(255) NOT NULL,
+    `created_at` datetime NULL DEFAULT CURRENT_TIMESTAMP,
+    `last_activity` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `username` (`username`),
+    UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS days (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    week_id INT NOT NULL,
-    day_number INT NOT NULL,
-    title VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (week_id) REFERENCES weeks(id)
-);
+-- Table: lessons (with foreign key dependencies)
+DROP TABLE IF EXISTS `lessons`;
+CREATE TABLE `lessons` (
+    `id` int NOT NULL AUTO_INCREMENT,
+    `course_id` int NOT NULL,
+    `week_id` int NOT NULL,
+    `day_id` int NOT NULL,
+    `lesson_name` varchar(255) NOT NULL,
+    `file_path` varchar(255) NOT NULL,
+    `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+    `lesson_time` datetime NULL,
+    PRIMARY KEY (`id`),
+    KEY `course_id` (`course_id`),
+    KEY `week_id` (`week_id`),
+    KEY `day_id` (`day_id`),
+    CONSTRAINT `lessons_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `lessons_ibfk_2` FOREIGN KEY (`week_id`) REFERENCES `weeks` (`id`) ON DELETE CASCADE,
+    CONSTRAINT `lessons_ibfk_3` FOREIGN KEY (`day_id`) REFERENCES `days` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
-CREATE TABLE IF NOT EXISTS lessons (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id INT NOT NULL,
-    week_id INT NOT NULL,
-    day_id INT NOT NULL,
-    lesson_name VARCHAR(255) NOT NULL,
-    file_path VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (course_id) REFERENCES courses(id),
-    FOREIGN KEY (week_id) REFERENCES weeks(id),
-    FOREIGN KEY (day_id) REFERENCES days(id)
-);
+-- Re-enable foreign key checks
+SET FOREIGN_KEY_CHECKS = 1;
 
--- Insert or update admin user
-INSERT INTO users (email, password, name, role, username, surname) 
-VALUES (
-    'admin@example.com', 
-    '$2b$10$SCbwOI/y7mY08p2Ko0mozujOzQZ4klZjrM3J1ZiwE4F9iZlD3Myz6', 
-    'Admin User',
-    'admin',
-    'Admin',
-    'User'
-)
-ON DUPLICATE KEY UPDATE 
-    role = 'admin',
-    username = 'Admin',
-    surname = 'User'; 
+-- Insert initial data
+INSERT INTO `courses` (`name`) VALUES ('react') ON DUPLICATE KEY UPDATE `name` = `name`;
+
+-- Add initial weeks
+INSERT INTO `weeks` (`name`) VALUES 
+('Week 1'),
+('Week 2'),
+('Week 3'),
+('Week 4')
+ON DUPLICATE KEY UPDATE `name` = VALUES(`name`);
+
+-- Add initial days
+INSERT INTO `days` (`day_name`) VALUES 
+('Monday'),
+('Tuesday'),
+('Wednesday'),
+('Thursday'),
+('Friday')
+ON DUPLICATE KEY UPDATE `day_name` = VALUES(`day_name`);
+
+-- Add an initial admin user (password should be hashed in production)
+INSERT INTO `users` (`username`, `surname`, `active`, `role`, `email`, `password`) 
+VALUES ('admin', 'admin', 1, 'admin', 'admin@test.com', '$2b$10$3euPcmQFCiblsZeEu5s7p.9MQICjYJ7ogs/Xr4OZ.1nUsZnKCvv4W')
+ON DUPLICATE KEY UPDATE `role` = 'admin'; 
