@@ -1589,141 +1589,128 @@ app.post('/api/chat', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    console.log('Received chat message:', message);
-
-    // Simplify the pattern matching to extract the name
-    let searchName = null;
+    // Extract name from message using a more robust pattern
+    let searchTerm = '';
     const messageLC = message.toLowerCase();
     
-    // Try different patterns to extract the name
-    if (messageLC.includes('about') && messageLC.includes('student')) {
-      searchName = messageLC.split('student')[1].trim();
-    } else if (messageLC.includes('about')) {
-      searchName = messageLC.split('about')[1].trim();
-    } else if (messageLC.includes('info') || messageLC.includes('information')) {
-      searchName = messageLC.replace(/info(rmation)?/gi, '').trim();
+    // Handle different message patterns
+    if (messageLC.includes('about')) {
+      searchTerm = messageLC.split('about')[1].trim();
+    } else if (messageLC.includes('info')) {
+      searchTerm = messageLC.split('info')[1].trim();
     } else {
-      // Just use the message as the name if it's a single word
-      searchName = messageLC.trim();
+      searchTerm = messageLC.trim();
+    }
+    
+    // Remove common words that might interfere with the search
+    searchTerm = searchTerm.replace(/user|student|information|give|me|tell|who|is/gi, '').trim();
+    
+    if (!searchTerm) {
+      return res.json({
+        response: 'Please provide a name to search for. You can ask about someone by saying "Tell me about [name]" or "Info about [name]".'
+      });
     }
 
-    if (searchName) {
-      console.log('Searching for student:', searchName);
+    console.log('Searching for user with term:', searchTerm);
 
+    // Search for the user in the database with improved matching
+    const [users] = await promisePool.query(
+      `SELECT id, username, surname, email 
+       FROM users 
+       WHERE LOWER(username) LIKE LOWER(?) 
+       OR LOWER(surname) LIKE LOWER(?)
+       OR LOWER(CONCAT(username, ' ', COALESCE(surname, ''))) LIKE LOWER(?)`,
+      [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
+    );
+
+    if (!users || users.length === 0) {
+      return res.json({
+        response: `I couldn't find anyone matching "${searchTerm}" in our database. Please check the spelling and try again.`
+      });
+    }
+
+    if (users.length > 1) {
+      const userList = users.map(u => `${u.username} ${u.surname || ''}`).join('\n- ');
+      return res.json({
+        response: `I found multiple people matching "${searchTerm}":\n- ${userList}\n\nPlease be more specific with the name.`
+      });
+    }
+
+    // Get the user's personal information
+    const user = users[0];
+    console.log('Found user:', user);
+
+    const [personalInfo] = await promisePool.query(
+      'SELECT section_name, section_data FROM personal_information WHERE user_id = ?',
+      [user.id]
+    );
+
+    console.log('Found personal info:', personalInfo);
+
+    if (personalInfo.length === 0) {
+      return res.json({
+        response: `📋 Found user: ${user.username} ${user.surname || ''}\nEmail: ${user.email}\n\nNo additional personal information available for this user.`
+      });
+    }
+
+    // Format the response in a more readable way
+    let response = `📋 Information about ${user.username} ${user.surname || ''}\n\n`;
+
+    // Process each section
+    for (const info of personalInfo) {
       try {
-        // First try exact match
-        const [exactUsers] = await promisePool.query(
-          `SELECT id, username, surname, email 
-           FROM users 
-           WHERE LOWER(username) = LOWER(?)`,
-          [searchName]
-        );
-
-        // If no exact match, try partial match
-        const users = exactUsers.length > 0 ? exactUsers : await promisePool.query(
-          `SELECT id, username, surname, email 
-           FROM users 
-           WHERE LOWER(username) LIKE LOWER(?) 
-           OR LOWER(surname) LIKE LOWER(?) 
-           OR LOWER(email) LIKE LOWER(?)`,
-          [`%${searchName}%`, `%${searchName}%`, `%${searchName}%`]
-        );
-
-        if (!users || users.length === 0) {
-          return res.json({
-            response: `I couldn't find any student named "${searchName}" in our database. Please check the spelling and try again.`
-          });
-        }
-
-        // Get the first matching user
-        const user = users[0];
-        console.log('Found user:', user);
-
-        // Get their personal information
-        const [personalInfo] = await promisePool.query(
-          'SELECT section_name, section_data FROM personal_information WHERE user_id = ?',
-          [user.id]
-        );
-
-        if (personalInfo.length === 0) {
-          return res.json({
-            response: `I found ${user.username} ${user.surname || ''} (${user.email}), but they haven't filled out their personal information yet.`
-          });
-        }
-
-        // Format the response
-        let response = `📋 Student Information for ${user.username} ${user.surname || ''}\n\n`;
-
-        // Sort sections in a specific order
-        const sectionOrder = ['profile', 'technical', 'programming'];
-        const sortedInfo = personalInfo.sort((a, b) => {
-          return sectionOrder.indexOf(a.section_name) - sectionOrder.indexOf(b.section_name);
-        });
-
-        sortedInfo.forEach(section => {
-          try {
-            const sectionData = JSON.parse(section.section_data);
-            response += `${section.section_name.toUpperCase()}\n`;
-
-            // Define field labels for each section
-            const fieldLabels = {
-              profile: {
-                fullName: 'Full Name',
-                email: 'Email',
-                phone: 'Phone',
-                age: 'Age',
-                institution: 'Institution',
-                fieldOfStudy: 'Field of Study',
-                yearOfStudy: 'Year of Study',
-                linkedIn: 'LinkedIn'
-              },
-              technical: {
-                operatingSystem: 'Operating System',
-                programmingLanguages: 'Programming Languages',
-                webTechnologies: 'Web Technologies',
-                databases: 'Databases',
-                tools: 'Tools'
-              },
-              programming: {
-                experience: 'Experience',
-                projects: 'Projects',
-                interests: 'Interests'
-              }
-            };
-
-            // Get the field labels for this section
-            const labels = fieldLabels[section.section_name] || {};
-
-            // Add each non-empty field to the response
-            Object.entries(sectionData).forEach(([key, value]) => {
-              if (value && value !== '') {
-                const label = labels[key] || key.replace(/([A-Z])/g, ' $1').trim();
-                response += `• ${label}: ${value}\n`;
-              }
-            });
+        const sectionData = JSON.parse(info.section_data);
+        console.log(`Processing section ${info.section_name}:`, sectionData);
+        
+        switch (info.section_name) {
+          case 'profile':
+            response += '👤 Profile:\n';
+            if (sectionData.bio) response += `• Bio: ${sectionData.bio}\n`;
+            if (sectionData.location) response += `• Location: ${sectionData.location}\n`;
+            if (sectionData.interests) response += `• Interests: ${sectionData.interests}\n`;
+            if (sectionData.email) response += `• Email: ${sectionData.email}\n`;
+            if (sectionData.phone) response += `• Phone: ${sectionData.phone}\n`;
+            if (sectionData.institution) response += `• Institution: ${sectionData.institution}\n`;
+            if (sectionData.fieldOfStudy) response += `• Field of Study: ${sectionData.fieldOfStudy}\n`;
+            if (sectionData.yearOfStudy) response += `• Year of Study: ${sectionData.yearOfStudy}\n`;
             response += '\n';
-          } catch (error) {
-            console.error(`Error parsing section data for ${section.section_name}:`, error);
-          }
-        });
-
-        return res.json({ response });
+            break;
+            
+          case 'technical':
+            response += '💻 Technical Skills:\n';
+            if (sectionData.skills) response += `• Skills: ${Array.isArray(sectionData.skills) ? sectionData.skills.join(', ') : sectionData.skills}\n`;
+            if (sectionData.experience) response += `• Experience: ${sectionData.experience}\n`;
+            if (sectionData.operatingSystem) response += `• Operating System: ${sectionData.operatingSystem}\n`;
+            if (sectionData.programmingLanguages) response += `• Programming Languages: ${Array.isArray(sectionData.programmingLanguages) ? sectionData.programmingLanguages.join(', ') : sectionData.programmingLanguages}\n`;
+            if (sectionData.webTechnologies) response += `• Web Technologies: ${Array.isArray(sectionData.webTechnologies) ? sectionData.webTechnologies.join(', ') : sectionData.webTechnologies}\n`;
+            if (sectionData.databases) response += `• Databases: ${Array.isArray(sectionData.databases) ? sectionData.databases.join(', ') : sectionData.databases}\n`;
+            if (sectionData.tools) response += `• Tools: ${Array.isArray(sectionData.tools) ? sectionData.tools.join(', ') : sectionData.tools}\n`;
+            response += '\n';
+            break;
+            
+          case 'programming':
+            response += '🚀 Programming:\n';
+            if (sectionData.languages) response += `• Languages: ${Array.isArray(sectionData.languages) ? sectionData.languages.join(', ') : sectionData.languages}\n`;
+            if (sectionData.frameworks) response += `• Frameworks: ${Array.isArray(sectionData.frameworks) ? sectionData.frameworks.join(', ') : sectionData.frameworks}\n`;
+            if (sectionData.projects) response += `• Projects: ${sectionData.projects}\n`;
+            if (sectionData.experience) response += `• Experience: ${sectionData.experience}\n`;
+            if (sectionData.interests) response += `• Interests: ${sectionData.interests}\n`;
+            response += '\n';
+            break;
+        }
       } catch (error) {
-        console.error('Database error:', error);
-        return res.json({
-          response: "I encountered an error while fetching the student information. Please try again."
-        });
+        console.error(`Error processing section ${info.section_name}:`, error);
       }
     }
 
-    // Default response if no student name is found in the message
-    return res.json({
-      response: "I can help you find information about students. Just type a student's name or ask something like 'info about [name]'."
-    });
+    console.log('Sending response:', response);
+    return res.json({ response });
 
   } catch (error) {
     console.error('Error in chat endpoint:', error);
-    return res.status(500).json({ error: 'Failed to process chat message' });
+    return res.status(500).json({
+      response: 'Sorry, I encountered an error while processing your request. Please try again.'
+    });
   }
 });
 
