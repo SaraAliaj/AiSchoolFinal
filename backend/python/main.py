@@ -135,6 +135,9 @@ the information in the lesson content above.
 For general questions or questions about topics mentioned in the lesson but not fully covered, you can use your general knowledge 
 while making it clear what information comes directly from the lesson versus your broader knowledge.
 
+IMPORTANT: Do NOT begin your responses with phrases like "From the lesson content:" or "Based on the lesson information:". 
+Just answer directly and conversationally as if you're a teacher helping a student.
+
 USER QUESTION: {user_input}
 
 Remember to be helpful and informative. Answer the question accurately based on the lesson content when possible, but provide helpful
@@ -178,20 +181,7 @@ general information when appropriate.
                 # Get the AI response
                 ai_response = response_data["choices"][0]["message"]["content"]
                 
-                # Add the lesson title prefix if we have one
-                if lesson_title:
-                    # Include PDF filename in the response for debugging
-                    pdf_name = os.path.basename(lesson_pdf_path) if lesson_pdf_path else "Unknown PDF"
-                    
-                    # Extract a cleaner lesson title without the filename
-                    clean_title = lesson_title
-                    if ': ' in lesson_title:
-                        # Extract just the lesson name part (after "Lesson X: ")
-                        parts = lesson_title.split(': ', 1)
-                        if len(parts) > 1 and parts[1]:
-                            clean_title = parts[0] + ': ' + parts[1].split('.pdf')[0]
-                    
-                    return f"[{clean_title}] {ai_response}"
+                # Return the response without adding the lesson title prefix
                 return ai_response
         
         # Handle error cases
