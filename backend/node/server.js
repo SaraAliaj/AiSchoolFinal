@@ -387,13 +387,17 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     console.log('Password hashed successfully');
 
-    // Insert new user with default role 'student'
+    // Determine role based on username and surname
+    const role = (username.toLowerCase() === 'admin' && surname.toLowerCase() === 'admin') ? 'admin' : 'student';
+    console.log(`Assigning role: ${role} for user: ${username} ${surname}`);
+
+    // Insert new user with determined role
     const [result] = await promisePool.query(
       'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-      [username, surname, email, hashedPassword, 'student', true]
+      [username, surname, email, hashedPassword, role, true]
     );
 
-    console.log('User registered successfully:', { id: result.insertId });
+    console.log('User registered successfully:', { id: result.insertId, role });
 
     const token = jwt.sign(
       { userId: result.insertId, email },
@@ -408,7 +412,7 @@ app.post('/api/auth/register', async (req, res) => {
         username,
         surname,
         email,
-        role: 'student',
+        role,
         active: true
       }
     });
@@ -1585,17 +1589,138 @@ app.post('/api/chat', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    console.log(`Received general chat message: ${message}`);
+    console.log('Received chat message:', message);
+
+    // Simplify the pattern matching to extract the name
+    let searchName = null;
+    const messageLC = message.toLowerCase();
     
-    // Generate a response - this is a simple implementation
-    // In a real app, you might integrate with an AI service
-    const response = `Thank you for your message: "${message}". This is a general chat response.`;
-    
-    // Log the request for analytics
-    console.log(`Chat request from user ${req.user.userId}: ${message}`);
-    
-    // Return the response
-    return res.json({ response });
+    // Try different patterns to extract the name
+    if (messageLC.includes('about') && messageLC.includes('student')) {
+      searchName = messageLC.split('student')[1].trim();
+    } else if (messageLC.includes('about')) {
+      searchName = messageLC.split('about')[1].trim();
+    } else if (messageLC.includes('info') || messageLC.includes('information')) {
+      searchName = messageLC.replace(/info(rmation)?/gi, '').trim();
+    } else {
+      // Just use the message as the name if it's a single word
+      searchName = messageLC.trim();
+    }
+
+    if (searchName) {
+      console.log('Searching for student:', searchName);
+
+      try {
+        // First try exact match
+        const [exactUsers] = await promisePool.query(
+          `SELECT id, username, surname, email 
+           FROM users 
+           WHERE LOWER(username) = LOWER(?)`,
+          [searchName]
+        );
+
+        // If no exact match, try partial match
+        const users = exactUsers.length > 0 ? exactUsers : await promisePool.query(
+          `SELECT id, username, surname, email 
+           FROM users 
+           WHERE LOWER(username) LIKE LOWER(?) 
+           OR LOWER(surname) LIKE LOWER(?) 
+           OR LOWER(email) LIKE LOWER(?)`,
+          [`%${searchName}%`, `%${searchName}%`, `%${searchName}%`]
+        );
+
+        if (!users || users.length === 0) {
+          return res.json({
+            response: `I couldn't find any student named "${searchName}" in our database. Please check the spelling and try again.`
+          });
+        }
+
+        // Get the first matching user
+        const user = users[0];
+        console.log('Found user:', user);
+
+        // Get their personal information
+        const [personalInfo] = await promisePool.query(
+          'SELECT section_name, section_data FROM personal_information WHERE user_id = ?',
+          [user.id]
+        );
+
+        if (personalInfo.length === 0) {
+          return res.json({
+            response: `I found ${user.username} ${user.surname || ''} (${user.email}), but they haven't filled out their personal information yet.`
+          });
+        }
+
+        // Format the response
+        let response = `📋 Student Information for ${user.username} ${user.surname || ''}\n\n`;
+
+        // Sort sections in a specific order
+        const sectionOrder = ['profile', 'technical', 'programming'];
+        const sortedInfo = personalInfo.sort((a, b) => {
+          return sectionOrder.indexOf(a.section_name) - sectionOrder.indexOf(b.section_name);
+        });
+
+        sortedInfo.forEach(section => {
+          try {
+            const sectionData = JSON.parse(section.section_data);
+            response += `${section.section_name.toUpperCase()}\n`;
+
+            // Define field labels for each section
+            const fieldLabels = {
+              profile: {
+                fullName: 'Full Name',
+                email: 'Email',
+                phone: 'Phone',
+                age: 'Age',
+                institution: 'Institution',
+                fieldOfStudy: 'Field of Study',
+                yearOfStudy: 'Year of Study',
+                linkedIn: 'LinkedIn'
+              },
+              technical: {
+                operatingSystem: 'Operating System',
+                programmingLanguages: 'Programming Languages',
+                webTechnologies: 'Web Technologies',
+                databases: 'Databases',
+                tools: 'Tools'
+              },
+              programming: {
+                experience: 'Experience',
+                projects: 'Projects',
+                interests: 'Interests'
+              }
+            };
+
+            // Get the field labels for this section
+            const labels = fieldLabels[section.section_name] || {};
+
+            // Add each non-empty field to the response
+            Object.entries(sectionData).forEach(([key, value]) => {
+              if (value && value !== '') {
+                const label = labels[key] || key.replace(/([A-Z])/g, ' $1').trim();
+                response += `• ${label}: ${value}\n`;
+              }
+            });
+            response += '\n';
+          } catch (error) {
+            console.error(`Error parsing section data for ${section.section_name}:`, error);
+          }
+        });
+
+        return res.json({ response });
+      } catch (error) {
+        console.error('Database error:', error);
+        return res.json({
+          response: "I encountered an error while fetching the student information. Please try again."
+        });
+      }
+    }
+
+    // Default response if no student name is found in the message
+    return res.json({
+      response: "I can help you find information about students. Just type a student's name or ask something like 'info about [name]'."
+    });
+
   } catch (error) {
     console.error('Error in chat endpoint:', error);
     return res.status(500).json({ error: 'Failed to process chat message' });
