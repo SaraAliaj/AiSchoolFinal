@@ -1,7 +1,7 @@
-import mysql from 'mysql2/promise';
-import fs from 'fs/promises';
-import bcrypt from 'bcrypt';
 import 'dotenv/config';
+import fs from 'fs';
+import { createConnection } from './database.js';
+import bcrypt from 'bcrypt';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -11,22 +11,19 @@ const __dirname = path.dirname(__filename);
 const initializeDatabase = async () => {
     console.log('Starting database initialization...');
     
-    const connection = await mysql.createConnection({
-        host: process.env.DB_HOST || 'localhost',
-        user: process.env.DB_USER || 'Sara',
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_NAME || 'aischool',
-        multipleStatements: true
-    });
+    let connection;
 
     try {
+        // Use our robust connection method from database.js
+        connection = await createConnection();    
         console.log('Database connection established');
+        
         console.log('Reading SQL initialization file...');
         
         const sqlPath = path.join(__dirname, 'init.sql');
         console.log('SQL file path:', sqlPath);
         
-        const sqlContent = await fs.readFile(sqlPath, 'utf8');
+        const sqlContent = await fs.promises.readFile(sqlPath, 'utf8');
         console.log('SQL file read successfully');
 
         // Replace the placeholder password with a properly hashed one

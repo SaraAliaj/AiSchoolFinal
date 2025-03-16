@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import mysql from 'mysql2/promise';
+import promisePool from './database.js';
 import { fileURLToPath } from 'url';
 
 /**
@@ -9,19 +9,9 @@ import { fileURLToPath } from 'url';
 async function ensureAdminRoles() {
   console.log('Ensuring admin roles are correctly set...');
   
-  let connection;
-  
   try {
-    // Connect to the database
-    connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'Sara',
-      password: process.env.DB_PASSWORD || 'Sara0330!!',
-      database: process.env.DB_NAME || 'aischool'
-    });
-    
     // Fix any variations of 'admin' roles (Admin, ADMIN, adminastrator, etc.) to be lowercase 'admin'
-    const [result] = await connection.query(
+    const [result] = await promisePool.query(
       `UPDATE users 
        SET role = 'admin' 
        WHERE LOWER(role) LIKE '%admin%' 
@@ -37,10 +27,6 @@ async function ensureAdminRoles() {
     console.log('Admin role check completed.');
   } catch (error) {
     console.error('Error checking admin roles:', error.message);
-  } finally {
-    if (connection) {
-      await connection.end();
-    }
   }
 }
 

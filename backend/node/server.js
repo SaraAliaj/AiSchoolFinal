@@ -11,6 +11,7 @@ import pdfIntegration from './pdf_integration.js';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import ensureAdminRoles from './ensure-admin-roles.js';
+import promisePool from './database.js'; // Import our promise pool
 
 const app = express();
 const httpServer = createServer(app);
@@ -55,27 +56,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Create a connection pool
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'Sara',
-  password: process.env.DB_PASSWORD || 'Sara0330!!',
-  database: process.env.DB_NAME || 'aischool',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
-
-// Create a promise-based wrapper for the pool
-const promisePool = pool.promise();
-
-console.log('Database configuration:', {
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'Sara',
-  database: process.env.DB_NAME || 'aischool',
-  hasPassword: !!process.env.DB_PASSWORD,
-  connectionLimit: 10
-});
+console.log('Database configuration loaded from database.js module');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -174,7 +155,7 @@ const connectToDatabase = async () => {
   try {
     // Test the connection with a simple query
     const [results] = await promisePool.query('SELECT 1 + 1 AS result');
-    console.log('Successfully connected to MySQL');
+    console.log('Successfully connected to MySQL using database.js module');
     console.log('Database test query successful:', results);
     
     // Ensure required tables exist
