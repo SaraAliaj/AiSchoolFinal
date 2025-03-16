@@ -311,7 +311,7 @@ export default function Chat() {
                           : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-lg'
                       }`}
                     >
-                      <div className={`text-sm leading-relaxed ${message.sender === 'ai' ? 'text-gray-700' : ''}`}>
+                      <div className={`text-sm leading-relaxed ${message.sender === 'ai' ? 'text-black' : ''}`}>
                         {renderStructuredContent(message.content, message.sender === 'ai')}
                       </div>
                     </div>

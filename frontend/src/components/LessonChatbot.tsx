@@ -77,7 +77,7 @@ export default function LessonChatbot({
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – your intelligent assistant from Albania! We empower the government to work more efficiently, optimize resources, and provide better services to citizens. Let's shape a more connected and tech-driven future for our beautiful country together! 🚀 ❤️⚫️`,
+      content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – Got questions about this lesson or anything else? I am here to help! 🚀 ❤️⚫️`,
       sender: 'ai',
       timestamp: new Date()
     }
@@ -345,6 +345,7 @@ export default function LessonChatbot({
     return formattedText;
   };
 
+  // Helper function to render structured content
   const renderStructuredMessage = (message: Message) => {
     const content = message.content;
     const isUserMessage = message.sender === 'user';
@@ -414,7 +415,7 @@ export default function LessonChatbot({
                 )}
                 <div className="space-y-1">
                   {section.content.map((item, i) => (
-                    <p key={i} className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} leading-relaxed mb-1`}>
+                    <p key={i} className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-black'} leading-relaxed mb-1`}>
                       {item}
                     </p>
                   ))}
@@ -427,40 +428,51 @@ export default function LessonChatbot({
       
       // For simple text, just format and render normally
       return (
-        <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-gray-700'} whitespace-pre-line leading-relaxed`}>
+        <p className={`text-sm ${isUserMessage ? 'text-primary-foreground' : 'text-black'} whitespace-pre-line leading-relaxed`}>
           {formatTextContent(content)}
         </p>
       );
     }
+    
+    const structuredContent = content as {
+      type: 'structured_summary' | 'qa_response' | 'general_response' | 'error';
+      title?: string;
+      sections?: Array<{
+        heading: string;
+        content: string | string[];
+      }>;
+      question?: string;
+      answer?: string;
+      examples?: string[];
+      references?: string[];
+      errorMessage?: string;
+    };
 
-    // For structured content types
-    switch (content.type) {
+    // Process different content types
+    switch (structuredContent.type) {
       case 'structured_summary':
         return (
-          <div className="space-y-4">
-            {content.title && (
-              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{formatTextContent(content.title)}</h3>
-            )}
-            {content.sections?.map((section, index) => (
-              <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm">
-                <h4 className="font-bold text-primary mb-3 flex items-center">
-                  {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
-                  {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
-                  {section.heading === 'Related Topics' && <BrainCircuit className="h-4 w-4 mr-2" />}
+          <div className="text-black space-y-4">
+            {structuredContent.title && <h3 className="font-semibold text-primary mb-2">{structuredContent.title}</h3>}
+            {structuredContent.sections?.map((section, i) => (
+              <div key={i} className="space-y-1.5">
+                <h4 className="font-medium text-primary/90 flex items-center text-sm">
                   {section.heading}
                 </h4>
-                <div className="text-sm text-gray-700 leading-relaxed">
-                  {Array.isArray(section.content) ? (
+                <div className="text-sm text-black leading-relaxed">
+                  {typeof section.content === 'string' ? (
+                    section.content.split('\n').map((line, j) => (
+                      line.trim() ? <p key={j} className="mb-2">{formatTextContent(line)}</p> : null
+                    ))
+                  ) : Array.isArray(section.content) ? (
                     <ul className="space-y-2">
-                      {section.content.map((item, i) => (
-                        <li key={i} className="pl-2 border-l-2 border-gray-300 ml-2">{formatTextContent(item)}</li>
+                      {section.content.map((item, j) => (
+                        <li key={j} className="pl-2 border-l-2 border-gray-300 ml-2">
+                          {formatTextContent(typeof item === 'string' ? item : String(item))}
+                        </li>
                       ))}
                     </ul>
-                  ) : (
-                    section.content.split('\n').map((line, i) => (
-                      line.trim() ? <p key={i} className="mb-2">{formatTextContent(line)}</p> : null
-                    ))
-                  )}
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -475,7 +487,7 @@ export default function LessonChatbot({
                 <MessageSquare className="h-4 w-4 mr-2" />
                 Question
               </h4>
-              <p className="text-sm text-gray-700 font-medium">{formatTextContent(content.question || '')}</p>
+              <p className="text-sm text-gray-700 font-medium">{formatTextContent(structuredContent.question || '')}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm">
               <h4 className="font-bold text-green-600 mb-2 flex items-center">
@@ -483,21 +495,21 @@ export default function LessonChatbot({
                 Answer
               </h4>
               <div className="text-sm text-gray-700 leading-relaxed">
-                {content.answer?.split('\n').map((line, i) => (
+                {typeof structuredContent.answer === 'string' && structuredContent.answer.split('\n').map((line, i) => (
                   line.trim() ? (
                     <p key={i} className="mb-2">{formatTextContent(line)}</p>
                   ) : null
                 ))}
               </div>
             </div>
-            {content.examples && content.examples.length > 0 && (
+            {structuredContent.examples && structuredContent.examples.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-400 shadow-sm">
                 <h4 className="font-bold text-blue-500 mb-2 flex items-center">
                   <FileIcon className="h-4 w-4 mr-2" />
                   Examples
                 </h4>
                 <ul className="space-y-2">
-                  {content.examples.map((example, i) => (
+                  {structuredContent.examples.map((example, i) => (
                     <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-blue-200 ml-2">
                       {formatTextContent(example)}
                     </li>
@@ -505,14 +517,14 @@ export default function LessonChatbot({
                 </ul>
               </div>
             )}
-            {content.references && content.references.length > 0 && (
+            {structuredContent.references && structuredContent.references.length > 0 && (
               <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-amber-400 shadow-sm">
                 <h4 className="font-bold text-amber-500 mb-2 flex items-center">
                   <Bookmark className="h-4 w-4 mr-2" />
                   References
                 </h4>
                 <ul className="space-y-2">
-                  {content.references.map((reference, i) => (
+                  {structuredContent.references.map((reference, i) => (
                     <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-amber-200 ml-2">
                       {formatTextContent(reference)}
                     </li>
@@ -526,35 +538,22 @@ export default function LessonChatbot({
       case 'general_response':
         return (
           <div className="space-y-4">
-            {content.title && (
-              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{formatTextContent(content.title)}</h3>
+            {structuredContent.title && (
+              <h3 className="text-lg font-bold text-primary border-b pb-2 mb-3">{formatTextContent(structuredContent.title)}</h3>
             )}
-            {content.sections?.map((section, index) => (
+            {structuredContent.sections?.map((section, index) => (
               <div key={index} className="bg-gray-50 rounded-lg p-4 border-l-4 border-primary shadow-sm mb-3">
                 <h4 className="font-medium text-primary mb-2 flex items-center">
-                  {section.heading === 'Response' && <MessageSquare className="h-4 w-4 mr-2" />}
-                  {section.heading === 'Summary' && <BookOpen className="h-4 w-4 mr-2" />}
-                  {section.heading === 'Key Points' && <Sparkles className="h-4 w-4 mr-2" />}
-                  {formatTextContent(section.heading)}
+                  {section.heading}
                 </h4>
-                {Array.isArray(section.content) ? (
-                  <ul className="space-y-2">
-                    {section.content.map((item, i) => (
-                      <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
-                        {formatTextContent(item)}
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <div className="text-sm text-gray-700 leading-relaxed">
-                    {/* Split text by line breaks and render each line separately */}
-                    {section.content.split('\n').map((line, i) => (
-                      line.trim() ? (
-                        <p key={i} className="mb-2">{formatTextContent(line)}</p>
-                      ) : null
-                    ))}
-                  </div>
-                )}
+                <div className="text-black leading-relaxed">
+                  {/* Split text by line breaks and render each line separately */}
+                  {typeof section.content === 'string' && section.content.split('\n').map((line, i) => (
+                    line.trim() ? (
+                      <p key={i} className="mb-2">{formatTextContent(line)}</p>
+                    ) : null
+                  ))}
+                </div>
               </div>
             ))}
           </div>
@@ -563,12 +562,12 @@ export default function LessonChatbot({
       case 'error':
         return (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-sm text-red-600">{formatTextContent(content.errorMessage || 'An error occurred')}</p>
+            <p className="text-sm text-red-600">{formatTextContent(structuredContent.errorMessage || 'An error occurred')}</p>
           </div>
         );
 
       default:
-        return <p className="text-sm text-gray-700">{formatTextContent(JSON.stringify(content))}</p>;
+        return <p className="text-sm text-gray-700">{formatTextContent(JSON.stringify(structuredContent))}</p>;
     }
   };
 
@@ -644,7 +643,7 @@ export default function LessonChatbot({
                     className={`rounded-2xl px-5 py-3 shadow-sm transition-all duration-200 ${
                       message.sender === 'user'
                         ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-tr-none'
-                        : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-md'
+                        : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-md text-black'
                     }`}
                   >
                     {renderStructuredMessage(message)}
