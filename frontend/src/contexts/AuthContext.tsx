@@ -56,12 +56,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const parsedUser = JSON.parse(userData);
           // Ensure user has a valid role
           parsedUser.role = validateRole(parsedUser.role);
+          // Log the role for debugging
+          console.log('User role from storage:', parsedUser.role);
           setUser(parsedUser);
           setIsAuthenticated(true);
           return true;
         }
       } else {
         // If token is invalid, clear local storage
+        console.log('Token invalid, clearing storage');
         localStorage.removeItem('authToken');
         localStorage.removeItem('user');
         setIsAuthenticated(false);
@@ -75,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const parsedUser = JSON.parse(userData);
         // Ensure user has a valid role
         parsedUser.role = validateRole(parsedUser.role);
+        console.log('Using cached user role:', parsedUser.role);
         setUser(parsedUser);
         setIsAuthenticated(true);
         return true;
@@ -98,10 +102,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // If server is unreachable, still use cached credentials
           setIsAuthenticated(true);
           const parsedUser = JSON.parse(userData);
-          // Ensure user has a valid role
+          // Ensure user has a valid role and log it
           parsedUser.role = validateRole(parsedUser.role);
+          console.log('Using cached credentials with role:', parsedUser.role);
           setUser(parsedUser);
         }
+      } else {
+        console.log('No stored credentials found');
       }
       setIsLoading(false);
     };
@@ -121,11 +128,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         role: validateRole(response.user?.role)
       };
       
+      // Log the role being set
+      console.log('Setting user role on login:', userObj.role);
+      
       localStorage.setItem('authToken', response.token);
       localStorage.setItem('user', JSON.stringify(userObj));
       setIsAuthenticated(true);
       setUser(userObj);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Login failed:', {
         message: error.message,
         response: error.response?.data

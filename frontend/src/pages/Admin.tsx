@@ -71,7 +71,7 @@ export default function Admin() {
   const [showStudentsDialog, setShowStudentsDialog] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
 
-  // Check admin access on component mount
+  // Check basic authentication
   useEffect(() => {
     if (isAuthLoading) {
       return; // Wait for auth to load
@@ -81,17 +81,7 @@ export default function Admin() {
       navigate('/login');
       return;
     }
-
-    if (user.role !== 'admin' && user.role !== 'student') {
-      toast({
-        title: "Access Denied",
-        description: "You must be an admin or student to access this page.",
-        variant: "destructive",
-      });
-      navigate('/');
-      return;
-    }
-  }, [user, navigate, toast, isAuthLoading]);
+  }, [user, navigate, isAuthLoading]);
 
   // Show loading state while auth is being checked
   if (isAuthLoading) {
@@ -105,8 +95,8 @@ export default function Admin() {
     );
   }
 
-  // If user is not admin or student, don't render the component
-  if (!user || (user.role !== 'admin' && user.role !== 'student')) {
+  // Only check if user is logged in
+  if (!user) {
     return null;
   }
 
