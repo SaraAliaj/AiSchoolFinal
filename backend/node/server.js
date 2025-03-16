@@ -92,6 +92,25 @@ const ensureTablesExist = async () => {
       console.log('Added last_activity column to users table');
     }
 
+    // Check if personal_information table exists
+    const [personalInfoCheck] = await promisePool.query('SHOW TABLES LIKE "personal_information"');
+    if (personalInfoCheck.length === 0) {
+      console.log('Creating personal_information table...');
+      await promisePool.query(`
+        CREATE TABLE personal_information (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          section_name VARCHAR(50) NOT NULL,
+          section_data JSON NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_user_section (user_id, section_name),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+      `);
+      console.log('Created personal_information table');
+    }
+
     // Check if lessons table exists
     const [lessonsCheck] = await promisePool.query('SHOW TABLES LIKE "lessons"');
     if (lessonsCheck.length === 0) {
@@ -404,6 +423,7 @@ const verifyToken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('No token provided or invalid token format');
     return res.status(401).json({ message: 'No token provided' });
   }
   
@@ -411,11 +431,10 @@ const verifyToken = (req, res, next) => {
   
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    // Set the decoded token data directly as req.user
-    req.user = {
-      userId: decoded.userId,
-      email: decoded.email
-    };
+    // Set both userId and user for compatibility
+    req.user = decoded;
+    req.userId = decoded.userId;
+    console.log('Token verified successfully:', { userId: decoded.userId });
     next();
   } catch (error) {
     console.error('Token verification error:', error);
@@ -1716,4 +1735,59 @@ app.post('/api/lessons/:id/chat', verifyToken, async (req, res) => {
 // Add health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Server is running' });
+});
+
+// Add the personal information endpoint
+app.post('/api/personal-info', verifyToken, async (req, res) => {
+  try {
+    const { section, data } = req.body;
+    const userId = req.userId; // Get userId directly
+
+    // Log the request for debugging
+    console.log('Saving personal info:', {
+      userId,
+      section,
+      data,
+      headers: req.headers
+    });
+
+    if (!userId) {
+      console.error('No user ID found in request');
+      return res.status(401).json({ 
+        error: 'User ID not found',
+        details: 'Authentication token may be invalid or expired'
+      });
+    }
+
+    // Check if section exists for user
+    const [existingRecord] = await promisePool.query(
+      'SELECT id FROM personal_information WHERE user_id = ? AND section_name = ?',
+      [userId, section]
+    );
+
+    if (existingRecord.length > 0) {
+      // Update existing record
+      await promisePool.query(
+        'UPDATE personal_information SET section_data = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND section_name = ?',
+        [JSON.stringify(data), userId, section]
+      );
+      console.log('Updated existing record for user:', userId);
+    } else {
+      // Insert new record
+      await promisePool.query(
+        'INSERT INTO personal_information (user_id, section_name, section_data) VALUES (?, ?, ?)',
+        [userId, section, JSON.stringify(data)]
+      );
+      console.log('Inserted new record for user:', userId);
+    }
+
+    res.json({ message: 'Personal information saved successfully' });
+  } catch (error) {
+    console.error('Error saving personal information:', error);
+    res.status(500).json({ 
+      error: 'Failed to save personal information',
+      details: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
 }); 
