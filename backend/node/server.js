@@ -1602,8 +1602,11 @@ app.post('/api/chat', verifyToken, async (req, res) => {
       searchTerm = messageLC.trim();
     }
     
-    // Remove common words that might interfere with the search
-    searchTerm = searchTerm.replace(/user|student|information|give|me|tell|who|is/gi, '').trim();
+    // Clean up the search term - remove special characters and extra spaces
+    searchTerm = searchTerm
+      .replace(/[\]\[\(\)]/g, '') // Remove brackets
+      .replace(/user|student|information|give|me|tell|who|is/gi, '')
+      .trim();
     
     if (!searchTerm) {
       return res.json({
@@ -1613,14 +1616,15 @@ app.post('/api/chat', verifyToken, async (req, res) => {
 
     console.log('Searching for user with term:', searchTerm);
 
-    // Search for the user in the database with improved matching
+    // Improved search query with better name matching
     const [users] = await promisePool.query(
       `SELECT id, username, surname, email 
        FROM users 
        WHERE LOWER(username) LIKE LOWER(?) 
-       OR LOWER(surname) LIKE LOWER(?)
-       OR LOWER(CONCAT(username, ' ', COALESCE(surname, ''))) LIKE LOWER(?)`,
-      [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
+          OR LOWER(surname) LIKE LOWER(?)
+          OR LOWER(CONCAT(username, ' ', COALESCE(surname, ''))) LIKE LOWER(?)
+          OR LOWER(email) LIKE LOWER(?)`,
+      [`%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`, `%${searchTerm}%`]
     );
 
     if (!users || users.length === 0) {
@@ -1640,8 +1644,16 @@ app.post('/api/chat', verifyToken, async (req, res) => {
     const user = users[0];
     console.log('Found user:', user);
 
+    // First verify the user exists in the users table
+    if (!user.username || !user.email) {
+      return res.json({
+        response: `I found a user but their information appears to be incomplete.`
+      });
+    }
+
+    // Get personal information with explicit JSON handling
     const [personalInfo] = await promisePool.query(
-      'SELECT section_name, section_data FROM personal_information WHERE user_id = ?',
+      'SELECT section_name, JSON_EXTRACT(section_data, "$") as section_data FROM personal_information WHERE user_id = ?',
       [user.id]
     );
 
@@ -1649,17 +1661,36 @@ app.post('/api/chat', verifyToken, async (req, res) => {
 
     if (personalInfo.length === 0) {
       return res.json({
-        response: `📋 Found user: ${user.username} ${user.surname || ''}\nEmail: ${user.email}\n\nNo additional personal information available for this user.`
+        response: `📋 Student Information for ${user.username} ${user.surname || ''}\n📧 Email: ${user.email || 'Not provided'}\n\nNo additional personal information available for this user.`
       });
     }
 
     // Format the response in a more readable way
-    let response = `📋 Information about ${user.username} ${user.surname || ''}\n\n`;
+    let response = `📋 Student Information for ${user.username} ${user.surname || ''}\n`;
+    response += `📧 Email: ${user.email || 'Not provided'}\n\n`;
 
-    // Process each section
+    // Process each section with proper error handling
     for (const info of personalInfo) {
       try {
-        const sectionData = JSON.parse(info.section_data);
+        let sectionData;
+        
+        // Handle the section data based on its type
+        if (typeof info.section_data === 'string' && info.section_data.startsWith('{')) {
+          try {
+            sectionData = JSON.parse(info.section_data);
+          } catch (e) {
+            console.log(`Warning: Could not parse JSON for section ${info.section_name}:`, e);
+            continue;
+          }
+        } else {
+          sectionData = info.section_data;
+        }
+
+        if (!sectionData) {
+          console.log(`Warning: No data for section ${info.section_name}`);
+          continue;
+        }
+
         console.log(`Processing section ${info.section_name}:`, sectionData);
         
         switch (info.section_name) {
@@ -1668,7 +1699,6 @@ app.post('/api/chat', verifyToken, async (req, res) => {
             if (sectionData.bio) response += `• Bio: ${sectionData.bio}\n`;
             if (sectionData.location) response += `• Location: ${sectionData.location}\n`;
             if (sectionData.interests) response += `• Interests: ${sectionData.interests}\n`;
-            if (sectionData.email) response += `• Email: ${sectionData.email}\n`;
             if (sectionData.phone) response += `• Phone: ${sectionData.phone}\n`;
             if (sectionData.institution) response += `• Institution: ${sectionData.institution}\n`;
             if (sectionData.fieldOfStudy) response += `• Field of Study: ${sectionData.fieldOfStudy}\n`;
@@ -1700,6 +1730,8 @@ app.post('/api/chat', verifyToken, async (req, res) => {
         }
       } catch (error) {
         console.error(`Error processing section ${info.section_name}:`, error);
+        // Continue with other sections if one fails
+        continue;
       }
     }
 
@@ -1838,7 +1870,7 @@ app.post('/api/lessons/:id/chat', verifyToken, async (req, res) => {
     
     // Return the response
     return res.json({ response });
-    } catch (error) {
+  } catch (error) {
     console.error('Error in lesson chat endpoint:', error);
     return res.status(500).json({ error: 'Failed to process chat message' });
   }
