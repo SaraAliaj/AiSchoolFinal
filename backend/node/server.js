@@ -50,6 +50,11 @@ app.use(cors({
 // Parse JSON bodies
 app.use(express.json());
 
+// Simple health check endpoint for Render
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Create a connection pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -183,13 +188,8 @@ const connectToDatabase = async () => {
 };
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
-});
-
-// Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
+  res.status(200).json({ status: 'ok', message: 'Server is running' });
 });
 
 // Database check endpoint
@@ -1317,8 +1317,22 @@ const startServer = async () => {
     // Ensure admin roles are set correctly
     await ensureAdminRoles();
     
-    // Start the HTTP server
-    // ... existing code ...
+    // Ensure tables exist
+    await ensureTablesExist();
+    
+    // Clean up online status on server start
+    await cleanupOnlineStatus();
+    
+    // Get PORT from environment variable
+    const PORT = process.env.PORT || 3000;
+    console.log(`Starting server with PORT=${PORT}`);
+    
+    // Start the HTTP server - binding to 0.0.0.0 is critical for Render deployment
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+      console.log(`Frontend URL: ${FRONTEND_URL}`);
+      console.log(`Server is listening on http://0.0.0.0:${PORT}`);
+    });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
