@@ -112,16 +112,25 @@ export default function Admin() {
           api.getDays()
         ]);
         
-        console.log('Days data:', daysData);
+        // Validate and ensure the data is in array format
+        const validCoursesData = Array.isArray(coursesData) ? coursesData : [];
+        const validWeeksData = Array.isArray(weeksData) ? weeksData : [];
+        const validDaysData = Array.isArray(daysData) ? daysData : [];
         
-        setCourses(coursesData);
-        setWeeks(weeksData);
-        setDays(daysData);
+        console.log('Days data:', validDaysData);
+        
+        setCourses(validCoursesData);
+        setWeeks(validWeeksData);
+        setDays(validDaysData);
       } catch (error) {
         console.error("Failed to fetch data:", error);
+        // Set empty arrays as fallback
+        setCourses([]);
+        setWeeks([]);
+        setDays([]);
         toast({
           title: "Error",
-          description: "Failed to load required data",
+          description: "Failed to load required data. Please try refreshing the page.",
           variant: "destructive",
         });
       } finally {
@@ -421,7 +430,7 @@ export default function Admin() {
                           <SelectValue placeholder="Select course" />
                         </SelectTrigger>
                         <SelectContent>
-                          {courses.map((course) => (
+                          {Array.isArray(courses) && courses.map((course) => (
                             <SelectItem key={course.id} value={String(course.id)}>
                               {course.name}
                             </SelectItem>
@@ -437,7 +446,7 @@ export default function Admin() {
                           <SelectValue placeholder="Select week" />
                         </SelectTrigger>
                         <SelectContent>
-                          {weeks.map((week) => (
+                          {Array.isArray(weeks) && weeks.map((week) => (
                             <SelectItem key={week.id} value={String(week.id)}>
                               {week.name}
                             </SelectItem>
@@ -453,7 +462,7 @@ export default function Admin() {
                           <SelectValue placeholder="Select day" />
                         </SelectTrigger>
                         <SelectContent>
-                          {days.map((day) => (
+                          {Array.isArray(days) && days.map((day) => (
                             <SelectItem key={day.id} value={String(day.id)}>
                               {day.day_name}
                             </SelectItem>
