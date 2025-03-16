@@ -45,7 +45,7 @@ interface Student {
   username: string;
   surname: string;
   email: string;
-  role: string;
+  role: 'student' | 'lead_student' | 'admin';
 }
 
 export default function Admin() {
@@ -61,7 +61,7 @@ export default function Admin() {
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const navigate = useNavigate();
   const [newCourseName, setNewCourseName] = useState("");
   const [isCreatingCourse, setIsCreatingCourse] = useState(false);
@@ -73,24 +73,40 @@ export default function Admin() {
 
   // Check admin access on component mount
   useEffect(() => {
+    if (isAuthLoading) {
+      return; // Wait for auth to load
+    }
+
     if (!user) {
       navigate('/login');
       return;
     }
 
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'lead_student') {
       toast({
         title: "Access Denied",
-        description: "You don't have permission to access the admin panel.",
+        description: "You must be an admin or lead student to access this page.",
         variant: "destructive",
       });
       navigate('/');
       return;
     }
-  }, [user, navigate, toast]);
+  }, [user, navigate, toast, isAuthLoading]);
 
-  // If user is not admin, don't render the component
-  if (!user || user.role !== 'admin') {
+  // Show loading state while auth is being checked
+  if (isAuthLoading) {
+    return (
+      <div className="container max-w-4xl mx-auto py-4 flex justify-center items-center min-h-[300px]">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-2 text-gray-500">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is not admin or lead student, don't render the component
+  if (!user || (user.role !== 'admin' && user.role !== 'lead_student')) {
     return null;
   }
 
@@ -331,7 +347,9 @@ export default function Admin() {
     <div className="container mx-auto p-8 min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <Card className="p-8 shadow-lg border-t-4 border-t-primary">
         <CardHeader className="pb-8">
-          <CardTitle className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">Admin Panel</CardTitle>
+          <CardTitle className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/70">
+            Admin Panel
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 my-8">
@@ -344,7 +362,7 @@ export default function Admin() {
                       <Plus className="w-8 h-8 text-white" />
                     </div>
                     <span className="text-xl font-medium">Add Course</span>
-                    <p className="text-sm text-gray-500 text-center">Create a new course </p>
+                    <p className="text-sm text-gray-500 text-center">Create a new course</p>
                   </div>
                 </Button>
               </DialogTrigger>
