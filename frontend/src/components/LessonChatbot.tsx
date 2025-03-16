@@ -99,7 +99,7 @@ export default function LessonChatbot({
     const tryConnect = () => {
       console.log('Connecting to WebSocket server...');
       
-      const ws = new WebSocket('ws://localhost:8080');
+      const ws = new WebSocket('ws://localhost:8081/grok');
       
       ws.onopen = () => {
         console.log('Connected to WebSocket server');
@@ -245,12 +245,18 @@ export default function LessonChatbot({
 
     try {
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        socketRef.current.send(input.trim());
+        const messageData = {
+          message: input.trim(),
+          lessonId: lessonId
+        };
+        
+        console.log(`Sending message to chatbot for lesson ${lessonId}:`, messageData);
+        socketRef.current.send(JSON.stringify(messageData));
       } else {
         throw new Error('WebSocket connection not available');
       }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Error sending message:', error);
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",

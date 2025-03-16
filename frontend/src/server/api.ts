@@ -185,7 +185,11 @@ const api = {
 
   getLessonContent: async (lessonId: string) => {
     try {
-      const response = await axiosInstance.get(`/lessons/${lessonId}/content`);
+      // Ensure lessonId is always treated as a string
+      const safeId = String(lessonId);
+      console.log(`API requesting content for lesson ID: ${safeId}`);
+      
+      const response = await axiosInstance.get(`/lessons/${safeId}/content`);
       return response.data;
     } catch (error) {
       console.error('Failed to fetch lesson content:', error);
@@ -223,13 +227,18 @@ const api = {
         return [];
       }
 
+      // Print lessons IDs for debugging
+      console.log('Received lessons with IDs:', lessons.map(l => l.id).join(', '));
+
       // Group lessons by course, week, and day
       const courseMap = new Map();
 
       // Process each lesson to build the course structure
       lessons.forEach(lesson => {
-        const courseId = lesson.course_id.toString();
-        const weekId = lesson.week_id.toString();
+        const courseId = String(lesson.course_id);
+        const weekId = String(lesson.week_id);
+        // Ensure lesson ID is always a string
+        const lessonId = String(lesson.id);
         
         // Initialize course if not exists
         if (!courseMap.has(courseId)) {
@@ -251,9 +260,9 @@ const api = {
           });
         }
         
-        // Add lesson to the week using the database ID directly
+        // Add lesson to the week using the database ID directly as string
         course.weeks.get(weekId).lessons.push({
-          id: lesson.id.toString(),
+          id: lessonId,
           name: `${lesson.day_name}: ${lesson.title}`,
         });
       });
@@ -263,6 +272,18 @@ const api = {
         ...course,
         weeks: Array.from(course.weeks.values())
       }));
+
+      // Log the final course structure for debugging
+      console.log('Course structure built with:', result.length, 'courses');
+      result.forEach(course => {
+        console.log(`Course ${course.id}: ${course.name} with ${course.weeks.length} weeks`);
+        course.weeks.forEach(week => {
+          console.log(`  Week ${week.id}: ${week.name} with ${week.lessons.length} lessons`);
+          week.lessons.forEach(lesson => {
+            console.log(`    Lesson ${lesson.id}: ${lesson.name}`);
+          });
+        });
+      });
 
       return result;
     } catch (error) {

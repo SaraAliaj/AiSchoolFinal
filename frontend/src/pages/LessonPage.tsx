@@ -27,15 +27,25 @@ export default function LessonPage() {
 
       try {
         setIsLoading(true);
+        console.log(`Attempting to fetch content for lesson ID: ${lessonId}`);
+        
         const response = await api.getLessonContent(lessonId);
+        console.log(`Successfully loaded lesson: ${lessonId}`, response);
+        
         setLessonData({
           id: lessonId,
           title: response.title,
           content: response.content
         });
       } catch (err) {
-        console.error('Error fetching lesson:', err);
-        setError('Failed to load lesson content');
+        console.error(`Error fetching lesson ${lessonId}:`, err);
+        
+        if (err.response && err.response.status === 404) {
+          console.log(`Lesson ID ${lessonId} not found on the server`);
+          setError(`Lesson ${lessonId} not found. Please select a valid lesson from the sidebar.`);
+        } else {
+          setError('Failed to load lesson content. Please try again later.');
+        }
       } finally {
         setIsLoading(false);
       }

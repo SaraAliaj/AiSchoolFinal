@@ -19,7 +19,8 @@ import {
   Bot,
   Calendar,
   GraduationCap,
-  BookOpenCheck
+  BookOpenCheck,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +46,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from '@/components/ui/use-toast';
 
 // Define types for our data structure
 interface Lesson {
@@ -114,10 +116,11 @@ const NotificationDialog = ({ type, data, onOpenChange, open }: NotificationDial
 
 export default function Layout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout, user } = useAuth();
+  const { toast } = useToast();
   const [openCourses, setOpenCourses] = useState<string[]>([]);
   const [openWeeks, setOpenWeeks] = useState<string[]>([]);
-  const [completedLessons, setCompletedLessons] = useState<string[]>([]);
   const [isCurriculumOpen, setIsCurriculumOpen] = useState(false);
   const [courses, setCourses] = useState<Course[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -129,7 +132,19 @@ export default function Layout() {
   };
 
   const handleLessonClick = (lesson: Lesson) => {
-    navigate(`/lessons/${lesson.id}`);
+    if (lesson && lesson.id) {
+      // Always use the exact ID from the database (converted to string)
+      const lessonId = String(lesson.id);
+      console.log(`Navigating to lesson: ${lessonId} - ${lesson.name}`);
+      navigate(`/lessons/${lessonId}`);
+    } else {
+      console.error('Attempted to navigate to invalid lesson:', lesson);
+      toast({
+        title: "Lesson Not Available",
+        description: "This lesson is not currently available.",
+        variant: "destructive"
+      });
+    }
   };
 
   const toggleSidebar = () => {
@@ -149,14 +164,6 @@ export default function Layout() {
       prev.includes(weekId) 
         ? prev.filter(id => id !== weekId)
         : [...prev, weekId]
-    );
-  };
-
-  const toggleLessonComplete = (lessonId: string) => {
-    setCompletedLessons(prev => 
-      prev.includes(lessonId) 
-        ? prev.filter(id => id !== lessonId)
-        : [...prev, lessonId]
     );
   };
 
