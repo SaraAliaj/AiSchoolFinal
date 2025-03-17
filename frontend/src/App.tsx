@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { WebSocketProvider } from '@/contexts/WebSocketContext';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import LoginForm from "@/components/auth/LoginForm";
 import RegisterForm from "@/components/auth/RegisterForm";
@@ -29,6 +30,25 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+// WebSocket enabled route component
+const WebSocketEnabledRoute = ({ children }) => {
+  const { user } = useAuth();
+  
+  if (!user) {
+    return children;
+  }
+  
+  return (
+    <WebSocketProvider 
+      userId={user.id.toString()} 
+      username={user.username} 
+      role={user.role}
+    >
+      {children}
+    </WebSocketProvider>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -41,10 +61,12 @@ const App = () => (
             <Route path="/login" element={<LoginForm />} />
             <Route path="/register" element={<RegisterForm />} />
 
-            {/* Protected routes */}
+            {/* Protected routes with WebSocket */}
             <Route path="/" element={
               <ProtectedRoute>
-                <Layout />
+                <WebSocketEnabledRoute>
+                  <Layout />
+                </WebSocketEnabledRoute>
               </ProtectedRoute>
             }>
               <Route index element={<Navigate to="/chat" replace />} />

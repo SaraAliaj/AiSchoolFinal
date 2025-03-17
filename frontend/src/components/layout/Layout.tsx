@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Outlet, useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLesson } from "@/hooks/useLesson";
+import { useWebSocket } from "@/contexts/WebSocketContext";
 import { Button } from "@/components/ui/button";
 import {
   LogOut,
@@ -21,7 +23,10 @@ import {
   GraduationCap,
   BookOpenCheck,
   Loader2,
-  User
+  User,
+  PlayCircle,
+  StopCircle,
+  CheckCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -92,7 +97,7 @@ const NotificationDialog = ({ type, data, onOpenChange, open }: NotificationDial
           "text-xl font-bold",
           type === "start" ? "text-green-700" : "text-red-700"
         )}>
-          {type === "start" ? "Lesson Started" : "⚠️ Lesson Ended"}
+          {type === "start" ? "Lesson Started" : "Lesson Ended"}
         </DialogTitle>
       </DialogHeader>
       <div className="p-4">
@@ -102,14 +107,9 @@ const NotificationDialog = ({ type, data, onOpenChange, open }: NotificationDial
         )}>
           {type === "start" 
             ? "A new lesson has started:" 
-            : "The lesson has ended because the timer has expired:"}
+            : "The lesson has ended:"}
         </p>
         <p className="text-xl font-bold mt-2">{data?.lessonName}</p>
-        {type === "start" && (
-          <p className="text-sm text-gray-600 mt-2 flex items-center gap-2">
-            Duration: {data?.duration} minutes
-          </p>
-        )}
       </div>
     </DialogContent>
   </Dialog>
@@ -127,6 +127,20 @@ export default function Layout() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
+  // Add these new state variables for lesson management
+  const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
+  const [isLessonActive, setIsLessonActive] = useState(false);
+  const [lessonStartedBy, setLessonStartedBy] = useState<string | null>(null);
+  const [selectedDuration, setSelectedDuration] = useState<string>('');
+  const { startLesson, endLesson, loading: lessonLoading } = useLesson();
+  const { socket, isConnected } = useWebSocket();
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [showStartNotification, setShowStartNotification] = useState(false);
+  const [showEndNotification, setShowEndNotification] = useState(false);
+  const [notificationData, setNotificationData] = useState<{lessonName: string, duration?: number}>({
+    lessonName: ''
+  });
+
   const handleSignOut = () => {
     logout();
     navigate('/login');
@@ -137,6 +151,10 @@ export default function Layout() {
       // Always use the exact ID from the database (converted to string)
       const lessonId = String(lesson.id);
       console.log(`Navigating to lesson: ${lessonId} - ${lesson.name}`);
+      
+      // Set the active lesson for the Lead Student Controls
+      setActiveLesson(lesson);
+      
       navigate(`/lessons/${lessonId}`);
     } else {
       console.error('Attempted to navigate to invalid lesson:', lesson);
@@ -228,6 +246,237 @@ export default function Layout() {
 
     fetchCourseData();
   }, []);
+
+  // Add this function to extract the lesson ID from the URL
+  const getLessonIdFromUrl = () => {
+    const match = location.pathname.match(/\/lessons\/(\d+)/);
+    return match ? match[1] : null;
+  };
+
+  // Add a function to directly test WebSocket connection
+  const testWebSocketConnection = () => {
+    if (!socket) {
+      toast({
+        title: "WebSocket Not Available",
+        description: "WebSocket connection is not available.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (socket.readyState === WebSocket.OPEN) {
+        console.log("Testing WebSocket connection directly...");
+        const message = {
+          type: 'test_message',
+          message: 'Testing WebSocket connection',
+          timestamp: new Date().toISOString()
+        };
+        socket.send(JSON.stringify(message));
+        
+        toast({
+          title: "Test Message Sent",
+          description: "WebSocket test message sent successfully. Check console for details.",
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "WebSocket Not Connected",
+          description: `WebSocket is in state: ${
+            socket.readyState === WebSocket.CONNECTING ? 'CONNECTING' :
+            socket.readyState === WebSocket.CLOSING ? 'CLOSING' :
+            socket.readyState === WebSocket.CLOSED ? 'CLOSED' : 'UNKNOWN'
+          }`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error testing WebSocket:", error);
+      toast({
+        title: "WebSocket Test Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Update the handleStartLesson function to include a WebSocket test check 
+  const handleStartLesson = async () => {
+    // Get lesson ID from either activeLesson or from URL
+    const lessonId = activeLesson?.id || getLessonIdFromUrl();
+    
+    if (!lessonId) {
+      toast({
+        title: "Error",
+        description: "No lesson selected. Please select a lesson first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // First check if WebSocket is connected properly
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        testWebSocketConnection();
+        toast({
+          title: "Connection Issue",
+          description: "Attempting to ensure WebSocket connection before starting lesson...",
+          variant: "default",
+        });
+        // Wait briefly for the WebSocket to potentially connect
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+      
+      setIsLoading(true);
+      // If we don't have the active lesson object but have the ID, create a minimal lesson object
+      const currentLesson = activeLesson || { id: lessonId, name: `Lesson ${lessonId}` };
+      
+      await startLesson(lessonId);
+      setIsLessonActive(true);
+      setActiveLessonId(lessonId);
+      setLessonStartedBy(user?.username || 'Lead Student');
+      
+      // Also set the activeLesson if it's not already set
+      if (!activeLesson) {
+        setActiveLesson(currentLesson);
+      }
+      
+      // Show notification for the lead student
+      setNotificationData({
+        lessonName: currentLesson.name
+      });
+      setShowStartNotification(true);
+      
+      toast({
+        title: "Success",
+        description: "Lesson started successfully",
+        variant: "default",
+      });
+      
+      console.log(`Lesson ${lessonId} started by ${user?.username}`);
+    } catch (error) {
+      console.error("Failed to start lesson:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEndLesson = async () => {
+    if (!activeLessonId) {
+      toast({
+        title: "Error",
+        description: "No active lesson to end",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true); // Set local loading state
+      await endLesson(activeLessonId);
+      setIsLessonActive(false);
+      setActiveLessonId(null);
+      
+      // Show notification for the lead student
+      setNotificationData({
+        lessonName: activeLesson?.name || 'Current Lesson'
+      });
+      setShowEndNotification(true);
+      setActiveLesson(null);
+    } catch (error) {
+      console.error("Failed to end lesson:", error);
+    } finally {
+      setIsLoading(false); // Clear local loading state
+    }
+  };
+
+  // Add socket message handling for lesson events
+  useEffect(() => {
+    if (socket) {
+      const messageHandler = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log("WebSocket message received:", data);
+          
+          if (data.type === 'lesson_started') {
+            console.log("Lesson started event received");
+            setIsLessonActive(true);
+            setActiveLessonId(data.lesson_id?.toString());
+            setLessonStartedBy(data.user_name || 'Lead Student');
+            
+            // Find the lesson with this ID if possible
+            const lessonName = findLessonName(data.lesson_id) || 'New Lesson';
+            
+            // Show notification to all users except the initiator
+            const isInitiator = user?.username === data.user_name;
+            if (!isInitiator) {
+              setNotificationData({
+                lessonName: lessonName
+              });
+              setShowStartNotification(true);
+              
+              // Display toast notification for better visibility
+              toast({
+                title: "Lesson Started",
+                description: `${data.user_name || 'A lead student'} has started the lesson "${lessonName}"`,
+                variant: "default",
+              });
+            }
+          } 
+          else if (data.type === 'lesson_ended') {
+            console.log("Lesson ended event received");
+            setIsLessonActive(false);
+            
+            // Find the lesson with this ID if possible
+            const lessonName = findLessonName(data.lesson_id) || 'Current Lesson';
+            
+            // Show notification to all users except the initiator
+            const isInitiator = user?.username === data.user_name;
+            if (!isInitiator) {
+              setNotificationData({
+                lessonName: lessonName
+              });
+              setShowEndNotification(true);
+              
+              // Display toast notification for better visibility
+              toast({
+                title: "Lesson Ended",
+                description: `${data.user_name || 'A lead student'} has ended the lesson "${lessonName}"`,
+                variant: "default",
+              });
+            }
+            
+            setActiveLessonId(null);
+            setActiveLesson(null);
+          }
+        } catch (error) {
+          console.error('Error processing WebSocket message:', error);
+        }
+      };
+
+      socket.addEventListener('message', messageHandler);
+      
+      return () => {
+        socket.removeEventListener('message', messageHandler);
+      };
+    }
+  }, [socket, user, toast]);
+
+  // Helper function to find a lesson name by ID
+  const findLessonName = (lessonId: string | number): string | null => {
+    if (!lessonId) return null;
+    
+    const id = lessonId.toString();
+    
+    for (const course of courses) {
+      for (const week of course.weeks) {
+        const lesson = week.lessons.find(l => l.id.toString() === id);
+        if (lesson) return lesson.name;
+      }
+    }
+    
+    return null;
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -461,12 +710,144 @@ export default function Layout() {
         {/* Main Content */}
         <div className="flex-1 min-h-screen">
           <div className="h-full flex flex-col">
+            {/* Lead Student Controls - visible only to lead students */}
+            {user?.role === 'lead_student' && (
+              <div className="p-4 space-y-4">
+                <div className="bg-white p-4 rounded-lg border border-amber-200/50 shadow-sm">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="p-2 rounded-full bg-amber-50">
+                      <Crown className="h-5 w-5 text-amber-700" />
+                    </div>
+                    <p className="text-base text-amber-900 font-medium">
+                      Lead Student Controls
+                    </p>
+                  </div>
+                  
+                  <p className="text-sm text-amber-800/80 mb-4">
+                    As the lead student, you have the authority to manage this lesson. Choose wisely!
+                  </p>
+                  
+                  {!isLessonActive ? (
+                    <Button 
+                      onClick={handleStartLesson} 
+                      disabled={isLoading || lessonLoading}
+                      className="w-full bg-green-600 hover:bg-green-700 text-white transition-all"
+                    >
+                      {isLoading || lessonLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Starting Lesson...
+                        </>
+                      ) : (
+                        <>
+                          <PlayCircle className="mr-2 h-4 w-4" />
+                          Start Lesson
+                        </>
+                      )}
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={handleEndLesson} 
+                      disabled={isLoading || lessonLoading}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white transition-all"
+                    >
+                      {isLoading || lessonLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Ending Lesson...
+                        </>
+                      ) : (
+                        <>
+                          <StopCircle className="mr-2 h-4 w-4" />
+                          End Lesson
+                        </>
+                      )}
+                    </Button>
+                  )}
+
+                  {/* Add connection indicator */}
+                  <div className="mt-3 flex items-center justify-center text-xs">
+                    <div className={`rounded-full w-2 h-2 mr-2 ${
+                      socket && isConnected
+                        ? 'bg-green-500' 
+                        : 'bg-red-500'
+                    }`}></div>
+                    <span className="text-gray-500">
+                      {socket && isConnected
+                        ? 'Connected to server' 
+                        : 'Connection issue - please refresh'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Student Notification - visible only to students */}
+            {user?.role === 'student' && (
+              <div className="p-4">
+                <div className={`p-4 rounded-lg border shadow-sm ${
+                  isLessonActive 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    {isLessonActive ? (
+                      <>
+                        <div className="p-2 rounded-full bg-green-100">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-green-800">
+                            Lesson In Progress!
+                          </p>
+                          {lessonStartedBy && (
+                            <p className="text-sm text-green-700">
+                              {lessonStartedBy} has started this lesson. You can now participate actively!
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-2 rounded-full bg-amber-100">
+                          <Clock className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-amber-800">
+                            Waiting for Lesson to Begin
+                          </p>
+                          <p className="text-sm text-amber-700">
+                            The lead student will start the lesson soon. Please be patient and get ready!
+                          </p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Main Content Area */}
             <div className="w-full">
               <Outlet />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Notification Dialogs */}
+      <NotificationDialog 
+        type="start" 
+        data={notificationData} 
+        open={showStartNotification} 
+        onOpenChange={setShowStartNotification} 
+      />
+      <NotificationDialog 
+        type="end" 
+        data={notificationData} 
+        open={showEndNotification} 
+        onOpenChange={setShowEndNotification} 
+      />
     </div>
   );
 }
