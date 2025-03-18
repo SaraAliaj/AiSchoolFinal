@@ -26,7 +26,9 @@ import {
   User,
   PlayCircle,
   StopCircle,
-  CheckCircle
+  CheckCircle,
+  FileText,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -53,6 +55,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from '@/components/ui/use-toast';
+import { StudentLessonNotification } from '../StudentLessonNotification';
 
 // Define types for our data structure
 interface Lesson {
@@ -140,6 +143,7 @@ export default function Layout() {
   const [notificationData, setNotificationData] = useState<{lessonName: string, duration?: number}>({
     lessonName: ''
   });
+  const [showLessonStartPopup, setShowLessonStartPopup] = useState(false);
 
   const handleSignOut = () => {
     logout();
@@ -329,7 +333,11 @@ export default function Layout() {
       
       setIsLoading(true);
       // If we don't have the active lesson object but have the ID, create a minimal lesson object
-      const currentLesson = activeLesson || { id: lessonId, name: `Lesson ${lessonId}` };
+      const currentLesson = activeLesson || { 
+        id: lessonId, 
+        name: `Lesson ${lessonId}`,
+        time: new Date().toLocaleTimeString()
+      };
       
       await startLesson(lessonId);
       setIsLessonActive(true);
@@ -383,6 +391,7 @@ export default function Layout() {
       });
       setShowEndNotification(true);
       setActiveLesson(null);
+      setLessonStartedBy(null);
     } catch (error) {
       console.error("Failed to end lesson:", error);
     } finally {
@@ -392,75 +401,64 @@ export default function Layout() {
 
   // Add socket message handling for lesson events
   useEffect(() => {
-    if (socket) {
-      const messageHandler = (event: MessageEvent) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("WebSocket message received:", data);
-          
-          if (data.type === 'lesson_started') {
-            console.log("Lesson started event received");
-            setIsLessonActive(true);
-            setActiveLessonId(data.lesson_id?.toString());
-            setLessonStartedBy(data.user_name || 'Lead Student');
-            
-            // Find the lesson with this ID if possible
-            const lessonName = findLessonName(data.lesson_id) || 'New Lesson';
-            
-            // Show notification to all users except the initiator
-            const isInitiator = user?.username === data.user_name;
-            if (!isInitiator) {
-              setNotificationData({
-                lessonName: lessonName
-              });
-              setShowStartNotification(true);
-              
-              // Display toast notification for better visibility
-              toast({
-                title: "Lesson Started",
-                description: `${data.user_name || 'A lead student'} has started the lesson "${lessonName}"`,
-                variant: "default",
-              });
-            }
-          } 
-          else if (data.type === 'lesson_ended') {
-            console.log("Lesson ended event received");
-            setIsLessonActive(false);
-            
-            // Find the lesson with this ID if possible
-            const lessonName = findLessonName(data.lesson_id) || 'Current Lesson';
-            
-            // Show notification to all users except the initiator
-            const isInitiator = user?.username === data.user_name;
-            if (!isInitiator) {
-              setNotificationData({
-                lessonName: lessonName
-              });
-              setShowEndNotification(true);
-              
-              // Display toast notification for better visibility
-              toast({
-                title: "Lesson Ended",
-                description: `${data.user_name || 'A lead student'} has ended the lesson "${lessonName}"`,
-                variant: "default",
-              });
-            }
-            
-            setActiveLessonId(null);
-            setActiveLesson(null);
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      };
+    if (!socket) return;
 
-      socket.addEventListener('message', messageHandler);
-      
-      return () => {
-        socket.removeEventListener('message', messageHandler);
-      };
-    }
-  }, [socket, user, toast]);
+    socket.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log("WebSocket message received:", data);
+
+        if (data.type === 'lesson_started') {
+          console.log("Lesson started event received");
+          setIsLessonActive(true);
+          setActiveLessonId(data.lesson_id?.toString());
+          setLessonStartedBy(data.user_name || 'Lead Student');
+          
+          // Show popup for students only
+          if (user?.role === 'student') {
+            setShowLessonStartPopup(true);
+          }
+
+          // Show toast notification
+          toast({
+            title: "Lesson Started",
+            description: `${data.user_name || 'A lead student'} has started lesson ${data.lesson_id}`,
+            variant: "default",
+          });
+        } 
+        else if (data.type === 'lesson_ended') {
+          console.log("Lesson ended event received");
+          setIsLessonActive(false);
+          
+          // Find the lesson with this ID if possible
+          const lessonName = findLessonName(data.lesson_id) || `Lesson ${data.lesson_id}`;
+          
+          // Show notification to all users except the initiator
+          const isInitiator = user?.username === data.user_name;
+          if (!isInitiator) {
+            setNotificationData({
+              lessonName: lessonName
+            });
+            setShowEndNotification(true);
+            
+            // Display toast notification for better visibility
+            toast({
+              title: "Lesson Ended",
+              description: `${data.user_name || 'A lead student'} has ended the lesson "${lessonName}"`,
+              variant: "default",
+            });
+          }
+          
+          // Clear lesson state
+          setActiveLessonId(null);
+          setActiveLesson(null);
+          setLessonStartedBy(null);
+        }
+      } catch (error) {
+        console.error("Error processing WebSocket message:", error);
+      }
+    };
+  }, [socket, user]);
 
   // Helper function to find a lesson name by ID
   const findLessonName = (lessonId: string | number): string | null => {
@@ -479,376 +477,377 @@ export default function Layout() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex">
-        {/* Sidebar */}
-        <div className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} h-screen bg-gray-100 border-r transition-all duration-300 relative flex flex-col `}>
-          {/* Toggle Button - Positioned at the edge between sidebar and content */}
-          <button 
-            onClick={toggleSidebar}
-            className={`absolute -right-4 buttom-2 bg-white border border-gray-200 shadow-md rounded-full p-2 hover:bg-gray-100 transition-all duration-300 z-50 ${isSidebarCollapsed ? 'rotate-180' :  ''}`}
-            >
-            <ChevronLeft className="h-5 w-5 text-primary" />
-          </button>
-
-          {/* Top Section - Fixed */}
-          <div className="flex-shrink-0">
-            {/* Header */}
-            <div className={`p-5 border-b transition-all duration-300 ${isSidebarCollapsed ? 'p-3' : ''}`}>
-              <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
-                <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
-                  <Brain className="h-10 w-10 text-primary" />
-                </div>
-                <div className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
-                  <h1 className="text-2xl font-bold text-primary leading-tight">
-                    AI Academia
-                  </h1>
-                  <p className="text-xs text-muted-foreground italic">
-                    The Tirana school of AI where we make the government of Albania more efficient
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* User Profile */}
-            <div className={`p-5 border-b transition-all duration-300 ${isSidebarCollapsed ? 'p-3 flex justify-center' : ''}`}>
-              {user ? (
-                <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
-                  <div className="relative w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold flex-shrink-0">
-                    {user.username ? user.username.charAt(0).toUpperCase() : '?'}
-                    {isSidebarCollapsed && (
-                      <div className={cn(
-                        "absolute -bottom-1 -right-1 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border",
-                        user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
-                        user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 border-amber-300" :
-                        "bg-blue-100 text-blue-700 border-blue-200"
-                      )}>
-                        {user.role === 'admin' ? (
-                          <Settings className="h-3 w-3" />
-                        ) : user.role === 'lead_student' ? (
-                          <Crown className="h-3 w-3" />
-                        ) : (
-                          <BookOpen className="h-3 w-3" />
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <div>
-                      <div className="font-medium">{user.username}</div>
-                      <div className="text-sm text-muted-foreground">{user.email}</div>
-                      <div className={cn(
-                        "text-xs flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-full font-semibold shadow-sm border",
-                        user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
-                        user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800 border-amber-300" :
-                        "bg-blue-100 text-blue-700 border-blue-200"
-                      )}>
-                        {user.role === 'admin' ? (
-                          <>
-                            <Settings className="h-3.5 w-3.5" />
-                            <span>Administrator</span>
-                          </>
-                        ) : user.role === 'lead_student' ? (
-                          <>
-                            <Crown className="h-4 w-4 text-amber-600" />
-                            <span>Lead Student</span>
-                          </>
-                        ) : (
-                          <>
-                            <BookOpen className="h-3.5 w-3.5" />
-                            <span>Student</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
-                  <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold flex-shrink-0">
-                    ?
-                  </div>
-                  {!isSidebarCollapsed && (
-                    <div className="text-sm text-gray-500">Not logged in</div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-            
-          {/* Middle Section - Scrollable with fixed height */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <nav className="flex-1 overflow-y-auto">
-              <div className={`space-y-4 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
-                {/* Change from Home to General AI Chatbot and use Bot icon */}
-                <NavItem to="/chat" icon={Bot} collapsed={isSidebarCollapsed}>
-                  General AI Chatbot
-                </NavItem>
-
-                {/* Personal Information */}
-                <NavItem to="/personal-info" icon={User} collapsed={isSidebarCollapsed}>
-                  Personal Information
-                </NavItem>
-
-                {/* Curriculum Dropdown */}
-                {isSidebarCollapsed ? (
-                  <div className="flex justify-center">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={`h-9 w-9 relative`}
-                      onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
-                    >
-                      <BookOpen className="h-5 w-5" />
-                    </Button>
-                  </div>
-                ) : (
-                  <Collapsible open={isCurriculumOpen} onOpenChange={setIsCurriculumOpen} className="flex-shrink-0">
-                    <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2 text-gray-800 transition-all hover:bg-gray-200 font-bold text-base rounded-lg">
-                      <div className="flex items-center space-x-3">
-                        <BookOpen className="h-5 w-5" />
-                        <span>Curriculum</span>
-                      </div>
-                      <ChevronDown className={cn(
-                        "h-4 w-4 transition-transform duration-200",
-                        isCurriculumOpen && "transform rotate-180"
-                      )} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="mt-1 space-y-0.5 pl-4">
-                      {isLoading ? (
-                        <div className="px-3 py-2 text-gray-500">Loading courses...</div>
-                      ) : courses.length === 0 ? (
-                        <div className="px-3 py-2 text-gray-500">No courses available</div>
-                      ) : (
-                        courses.map(course => (
-                          <Collapsible
-                            key={course.id}
-                            open={openCourses.includes(course.id)}
-                            onOpenChange={() => toggleCourse(course.id)}
-                          >
-                            <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
-                              <div className="flex items-center gap-2">
-                                <span>{course.name}</span>
-                              </div>
-                              <ChevronDown className={cn(
-                                "h-4 w-4 transition-transform duration-200",
-                                openCourses.includes(course.id) && "transform rotate-180"
-                              )} />
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="ml-3 mt-0.5">
-                              <div className="border-l-2 border-gray-200 pl-2 space-y-0.5">
-                                {course.weeks.map(week => (
-                                  <Collapsible
-                                    key={week.id}
-                                    open={openWeeks.includes(week.id)}
-                                    onOpenChange={() => toggleWeek(week.id)}
-                                  >
-                                    <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
-                                      <div className="flex items-center gap-2">
-                                        <span>{week.name}</span>
-                                      </div>
-                                      <ChevronDown className={cn(
-                                        "h-4 w-4 transition-transform duration-200",
-                                        openWeeks.includes(week.id) && "transform rotate-180"
-                                      )} />
-                                    </CollapsibleTrigger>
-                                    <CollapsibleContent className="ml-3 mt-0.5">
-                                      <div className="border-l-2 border-gray-200 pl-2 space-y-0.5">
-                                        {week.lessons.map(lesson => renderLesson(lesson, course, week))}
-                                      </div>
-                                    </CollapsibleContent>
-                                  </Collapsible>
-                                ))}
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        ))
-                      )}
-                    </CollapsibleContent>
-                  </Collapsible>
-                )}
-
-                {/* Other navigation items */}
-                <div className="space-y-4">
-                  {/* Remove these three NavItem components */}
-                  {/* 
-                  <NavItem to="/challenges" icon={Home} collapsed={isSidebarCollapsed}>
-                    Challenges
-                  </NavItem>
-                  <NavItem to="/quizzes" icon={Home} collapsed={isSidebarCollapsed}>
-                    Quizzes
-                  </NavItem>
-                  <NavItem to="/group-chat" icon={Home} collapsed={isSidebarCollapsed}>
-                    Group Chat
-                  </NavItem>
-                  */}
-                  
-                  {/* Admin link - only show for admin users */}
-                  {user?.role === 'admin' && (
-                    <NavItem to="/admin" icon={Settings} collapsed={isSidebarCollapsed}>
-                      Admin
-                    </NavItem>
-                  )}
-                </div>
-              </div>
-            </nav>
-            
-            {/* Sign Out Button - Fixed at bottom */}
-            <div className={`p-3 border-t mt-auto flex-shrink-0 ${isSidebarCollapsed ? 'p-2' : ''}`}>
-              <Button 
-                variant="ghost" 
-                className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-start'} text-red-600 hover:text-red-700 hover:bg-red-50`}
-                onClick={handleSignOut}
+    <>
+      {user?.role === 'student' && (
+        <StudentLessonNotification
+          isOpen={showLessonStartPopup}
+          onClose={() => setShowLessonStartPopup(false)}
+          lessonId={activeLessonId || ''}
+        />
+      )}
+      <div className="min-h-screen bg-background">
+        <div className="flex">
+          {/* Sidebar */}
+          <div className={`${isSidebarCollapsed ? 'w-20' : 'w-72'} h-screen bg-gray-100 border-r transition-all duration-300 relative flex flex-col `}>
+            {/* Toggle Button - Positioned at the edge between sidebar and content */}
+            <button 
+              onClick={toggleSidebar}
+              className={`absolute -right-4 buttom-2 bg-white border border-gray-200 shadow-md rounded-full p-2 hover:bg-gray-100 transition-all duration-300 z-50 ${isSidebarCollapsed ? 'rotate-180' :  ''}`}
               >
-                <LogOut className={`${isSidebarCollapsed ? '' : 'mr-2'} h-4 w-4`} />
-                {!isSidebarCollapsed && <span>Sign Out</span>}
-              </Button>
-            </div>
-          </div>
-        </div>
+              <ChevronLeft className="h-5 w-5 text-primary" />
+            </button>
 
-        {/* Main Content */}
-        <div className="flex-1 min-h-screen">
-          <div className="h-full flex flex-col">
-            {/* Lead Student Controls - visible only to lead students */}
-            {user?.role === 'lead_student' && (
-              <div className="p-4 space-y-4">
-                <div className="bg-white p-4 rounded-lg border border-amber-200/50 shadow-sm">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-full bg-amber-50">
-                      <Crown className="h-5 w-5 text-amber-700" />
-                    </div>
-                    <p className="text-base text-amber-900 font-medium">
-                      Lead Student Controls
+            {/* Top Section - Fixed */}
+            <div className="flex-shrink-0">
+              {/* Header */}
+              <div className={`p-5 border-b transition-all duration-300 ${isSidebarCollapsed ? 'p-3' : ''}`}>
+                <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
+                  <div className="w-12 h-12 flex-shrink-0 flex items-center justify-center">
+                    <Brain className="h-10 w-10 text-primary" />
+                  </div>
+                  <div className={`transition-opacity duration-300 ${isSidebarCollapsed ? 'hidden' : 'block'}`}>
+                    <h1 className="text-2xl font-bold text-primary leading-tight">
+                      AI Academia
+                    </h1>
+                    <p className="text-xs text-muted-foreground italic">
+                      The Tirana school of AI where we make the government of Albania more efficient
                     </p>
                   </div>
-                  
-                  <p className="text-sm text-amber-800/80 mb-4">
-                    As the lead student, you have the authority to manage this lesson. Choose wisely!
-                  </p>
-                  
-                  {!isLessonActive ? (
-                    <Button 
-                      onClick={handleStartLesson} 
-                      disabled={isLoading || lessonLoading}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white transition-all"
-                    >
-                      {isLoading || lessonLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Starting Lesson...
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="mr-2 h-4 w-4" />
-                          Start Lesson
-                        </>
-                      )}
-                    </Button>
-                  ) : (
-                    <Button 
-                      onClick={handleEndLesson} 
-                      disabled={isLoading || lessonLoading}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white transition-all"
-                    >
-                      {isLoading || lessonLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Ending Lesson...
-                        </>
-                      ) : (
-                        <>
-                          <StopCircle className="mr-2 h-4 w-4" />
-                          End Lesson
-                        </>
-                      )}
-                    </Button>
-                  )}
-
-                  {/* Add connection indicator */}
-                  <div className="mt-3 flex items-center justify-center text-xs">
-                    <div className={`rounded-full w-2 h-2 mr-2 ${
-                      socket && isConnected
-                        ? 'bg-green-500' 
-                        : 'bg-red-500'
-                    }`}></div>
-                    <span className="text-gray-500">
-                      {socket && isConnected
-                        ? 'Connected to server' 
-                        : 'Connection issue - please refresh'}
-                    </span>
-                  </div>
                 </div>
               </div>
-            )}
-            
-            {/* Student Notification - visible only to students */}
-            {user?.role === 'student' && (
-              <div className="p-4">
-                <div className={`p-4 rounded-lg border shadow-sm ${
-                  isLessonActive 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-amber-50 border-amber-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                    {isLessonActive ? (
-                      <>
-                        <div className="p-2 rounded-full bg-green-100">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        </div>
-                        <div>
-                          <p className="font-medium text-green-800">
-                            Lesson In Progress!
-                          </p>
-                          {lessonStartedBy && (
-                            <p className="text-sm text-green-700">
-                              {lessonStartedBy} has started this lesson. You can now participate actively!
-                            </p>
+              
+              {/* User Profile */}
+              <div className={`p-5 border-b transition-all duration-300 ${isSidebarCollapsed ? 'p-3 flex justify-center' : ''}`}>
+                {user ? (
+                  <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
+                    <div className="relative w-10 h-10 rounded-full bg-primary text-white flex items-center justify-center font-bold flex-shrink-0">
+                      {user.username ? user.username.charAt(0).toUpperCase() : '?'}
+                      {isSidebarCollapsed && (
+                        <div className={cn(
+                          "absolute -bottom-1 -right-1 rounded-full w-5 h-5 flex items-center justify-center shadow-sm border",
+                          user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
+                          user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-700 border-amber-300" :
+                          "bg-blue-100 text-blue-700 border-blue-200"
+                        )}>
+                          {user.role === 'admin' ? (
+                            <Settings className="h-3 w-3" />
+                          ) : user.role === 'lead_student' ? (
+                            <Crown className="h-3 w-3" />
+                          ) : (
+                            <BookOpen className="h-3 w-3" />
                           )}
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="p-2 rounded-full bg-amber-100">
-                          <Clock className="h-5 w-5 text-amber-600" />
+                      )}
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <div>
+                        <div className="font-medium">{user.username}</div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                        <div className={cn(
+                          "text-xs flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-full font-semibold shadow-sm border",
+                          user.role === 'admin' ? "bg-purple-100 text-purple-800 border-purple-200" :
+                          user.role === 'lead_student' ? "bg-gradient-to-r from-amber-100 to-amber-200 text-amber-800 border-amber-300" :
+                          "bg-blue-100 text-blue-700 border-blue-200"
+                        )}>
+                          {user.role === 'admin' ? (
+                            <>
+                              <Settings className="h-3.5 w-3.5" />
+                              <span>Administrator</span>
+                            </>
+                          ) : user.role === 'lead_student' ? (
+                            <>
+                              <Crown className="h-4 w-4 text-amber-600" />
+                              <span>Lead Student</span>
+                            </>
+                          ) : (
+                            <>
+                              <BookOpen className="h-3.5 w-3.5" />
+                              <span>Student</span>
+                            </>
+                          )}
                         </div>
-                        <div>
-                          <p className="font-medium text-amber-800">
-                            Waiting for Lesson to Begin
-                          </p>
-                          <p className="text-sm text-amber-700">
-                            The lead student will start the lesson soon. Please be patient and get ready!
-                          </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className={`flex items-center ${isSidebarCollapsed ? '' : 'gap-3'}`}>
+                    <div className="w-10 h-10 rounded-full bg-gray-300 text-gray-600 flex items-center justify-center font-bold flex-shrink-0">
+                      ?
+                    </div>
+                    {!isSidebarCollapsed && (
+                      <div className="text-sm text-gray-500">Not logged in</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+              
+            {/* Middle Section - Scrollable with fixed height */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <nav className="flex-1 overflow-y-auto">
+                <div className={`space-y-4 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
+                  {/* Change from Home to General AI Chatbot and use Bot icon */}
+                  <NavItem to="/chat" icon={Bot} collapsed={isSidebarCollapsed}>
+                    General AI Chatbot
+                  </NavItem>
+
+                  {/* Personal Information */}
+                  <NavItem to="/personal-info" icon={User} collapsed={isSidebarCollapsed}>
+                    Personal Information
+                  </NavItem>
+
+                  {/* Curriculum Dropdown */}
+                  {isSidebarCollapsed ? (
+                    <div className="flex justify-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={`h-9 w-9 relative`}
+                        onClick={() => setIsCurriculumOpen(!isCurriculumOpen)}
+                      >
+                        <BookOpen className="h-5 w-5" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Collapsible open={isCurriculumOpen} onOpenChange={setIsCurriculumOpen} className="flex-shrink-0">
+                      <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-2 text-gray-800 transition-all hover:bg-gray-200 font-bold text-base rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <BookOpen className="h-5 w-5" />
+                          <span>Curriculum</span>
                         </div>
-                      </>
+                        <ChevronDown className={cn(
+                          "h-4 w-4 transition-transform duration-200",
+                          isCurriculumOpen && "transform rotate-180"
+                        )} />
+                      </CollapsibleTrigger>
+                      <CollapsibleContent className="mt-1 space-y-0.5 pl-4">
+                        {isLoading ? (
+                          <div className="px-3 py-2 text-gray-500">Loading courses...</div>
+                        ) : courses.length === 0 ? (
+                          <div className="px-3 py-2 text-gray-500">No courses available</div>
+                        ) : (
+                          courses.map(course => (
+                            <Collapsible
+                              key={course.id}
+                              open={openCourses.includes(course.id)}
+                              onOpenChange={() => toggleCourse(course.id)}
+                            >
+                              <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
+                                <div className="flex items-center gap-2">
+                                  <span>{course.name}</span>
+                                </div>
+                                <ChevronDown className={cn(
+                                  "h-4 w-4 transition-transform duration-200",
+                                  openCourses.includes(course.id) && "transform rotate-180"
+                                )} />
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="ml-3 mt-0.5">
+                                <div className="border-l-2 border-gray-200 pl-2 space-y-0.5">
+                                  {course.weeks.map(week => (
+                                    <Collapsible
+                                      key={week.id}
+                                      open={openWeeks.includes(week.id)}
+                                      onOpenChange={() => toggleWeek(week.id)}
+                                    >
+                                      <CollapsibleTrigger className="flex w-full items-center justify-between px-3 py-2 text-gray-800 hover:bg-gray-200 rounded-lg font-medium">
+                                        <div className="flex items-center gap-2">
+                                          <span>{week.name}</span>
+                                        </div>
+                                        <ChevronDown className={cn(
+                                          "h-4 w-4 transition-transform duration-200",
+                                          openWeeks.includes(week.id) && "transform rotate-180"
+                                        )} />
+                                      </CollapsibleTrigger>
+                                      <CollapsibleContent className="ml-3 mt-0.5">
+                                        <div className="border-l-2 border-gray-200 pl-2 space-y-0.5">
+                                          {week.lessons.map(lesson => renderLesson(lesson, course, week))}
+                                        </div>
+                                      </CollapsibleContent>
+                                    </Collapsible>
+                                  ))}
+                                </div>
+                              </CollapsibleContent>
+                            </Collapsible>
+                          ))
+                        )}
+                      </CollapsibleContent>
+                    </Collapsible>
+                  )}
+
+                  {/* Other navigation items */}
+                  <div className="space-y-4">
+                    {/* Remove these three NavItem components */}
+                    {/* 
+                    <NavItem to="/challenges" icon={Home} collapsed={isSidebarCollapsed}>
+                      Challenges
+                    </NavItem>
+                    <NavItem to="/quizzes" icon={Home} collapsed={isSidebarCollapsed}>
+                      Quizzes
+                    </NavItem>
+                    <NavItem to="/group-chat" icon={Home} collapsed={isSidebarCollapsed}>
+                      Group Chat
+                    </NavItem>
+                    */}
+                    
+                    {/* Admin link - only show for admin users */}
+                    {user?.role === 'admin' && (
+                      <NavItem to="/admin" icon={Settings} collapsed={isSidebarCollapsed}>
+                        Admin
+                      </NavItem>
                     )}
                   </div>
                 </div>
+              </nav>
+              
+              {/* Sign Out Button - Fixed at bottom */}
+              <div className={`p-3 border-t mt-auto flex-shrink-0 ${isSidebarCollapsed ? 'p-2' : ''}`}>
+                <Button 
+                  variant="ghost" 
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-2' : 'justify-start'} text-red-600 hover:text-red-700 hover:bg-red-50`}
+                  onClick={handleSignOut}
+                >
+                  <LogOut className={`${isSidebarCollapsed ? '' : 'mr-2'} h-4 w-4`} />
+                  {!isSidebarCollapsed && <span>Sign Out</span>}
+                </Button>
               </div>
-            )}
+            </div>
+          </div>
 
-            {/* Main Content Area */}
-            <div className="w-full">
-              <Outlet />
+          {/* Main Content */}
+          <div className="flex-1 min-h-screen">
+            <div className="h-full flex flex-col">
+              {/* Lead Student Controls - visible only to lead students and only on lessons page */}
+              {user?.role === 'lead_student' && location.pathname.includes('/lessons') && (
+                <div className="p-1">
+                  <div className="bg-white p-2 rounded-lg border border-amber-200/50 shadow-sm">
+                    {/* Add lesson title, icon and download PDF button at the top */}
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-bold flex items-center text-slate-800">
+                        <FileText className="mr-3 h-5 w-5 text-primary" />
+                        {activeLesson?.name || 'Setup&First API Call'}
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center gap-2 hover:bg-slate-50 transition-all duration-200"
+                          onClick={() => {
+                            const lessonId = activeLesson?.id || getLessonIdFromUrl();
+                            if (lessonId) {
+                              window.open(api.downloadLessonFile(lessonId), '_blank');
+                            }
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Download PDF
+                        </Button>
+                        
+                        {!isLessonActive ? (
+                          <Button 
+                            onClick={handleStartLesson} 
+                            disabled={isLoading || lessonLoading}
+                            className="bg-green-600 hover:bg-green-700 text-white transition-all whitespace-nowrap"
+                          >
+                            {isLoading || lessonLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Starting...
+                              </>
+                            ) : (
+                              <>
+                                <PlayCircle className="mr-2 h-4 w-4" />
+                                Start Lesson
+                              </>
+                            )}
+                          </Button>
+                        ) : (
+                          <Button 
+                            onClick={handleEndLesson} 
+                            disabled={isLoading || lessonLoading}
+                            className="bg-red-600 hover:bg-red-700 text-white transition-all whitespace-nowrap"
+                          >
+                            {isLoading || lessonLoading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Ending...
+                              </>
+                            ) : (
+                              <>
+                                <StopCircle className="mr-2 h-4 w-4" />
+                                End Lesson
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Student Notification - visible only to students */}
+              {user?.role === 'student' && location.pathname.includes('/lessons') && (
+                <div className="p-1">
+                  <div className="bg-white p-2 rounded-lg border border-amber-200/50 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-bold flex items-center text-slate-800">
+                        <FileText className="mr-3 h-5 w-5 text-primary" />
+                        {activeLesson?.name || 'Setup&First API Call'}
+                      </h2>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          className="flex items-center gap-2 hover:bg-slate-50 transition-all duration-200"
+                          onClick={() => {
+                            const lessonId = activeLesson?.id || getLessonIdFromUrl();
+                            if (lessonId) {
+                              window.open(api.downloadLessonFile(lessonId), '_blank');
+                            }
+                          }}
+                        >
+                          <Download className="h-4 w-4" />
+                          Download PDF
+                        </Button>
+                        
+                        {isLessonActive ? (
+                          <div className="text-green-700 font-medium flex items-center bg-green-50 px-3 py-1.5 rounded border border-green-200">
+                            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                            Lesson In Progress
+                          </div>
+                        ) : (
+                          <div className="text-amber-700 font-medium flex items-center bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
+                            <Clock className="h-4 w-4 mr-2 text-amber-600" />
+                            Waiting for Lesson to Begin
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Main Content Area */}
+              <div className="w-full">
+                <Outlet />
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Notification Dialogs */}
-      <NotificationDialog 
-        type="start" 
-        data={notificationData} 
-        open={showStartNotification} 
-        onOpenChange={setShowStartNotification} 
-      />
-      <NotificationDialog 
-        type="end" 
-        data={notificationData} 
-        open={showEndNotification} 
-        onOpenChange={setShowEndNotification} 
-      />
-    </div>
+        {/* Notification Dialogs */}
+        <NotificationDialog 
+          type="start" 
+          data={notificationData} 
+          open={showStartNotification} 
+          onOpenChange={setShowStartNotification} 
+        />
+        <NotificationDialog 
+          type="end" 
+          data={notificationData} 
+          open={showEndNotification} 
+          onOpenChange={setShowEndNotification} 
+        />
+      </div>
+    </>
   );
 }
 

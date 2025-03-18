@@ -29,13 +29,18 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
+  // Track loading state changes
+  useEffect(() => {
+    console.log("Loading state changed:", isLoading);
+  }, [isLoading]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isLoading]); // Also scroll when loading state changes
 
   // Initialize WebSocket connection
   useEffect(() => {
@@ -64,13 +69,17 @@ export default function Chat() {
               messageContent = event.data;
             }
 
-            const aiMessage: Message = {
-              id: Date.now().toString(),
-              content: messageContent,
-              sender: 'ai',
-              timestamp: new Date()
-            };
-            setMessages(prev => [...prev, aiMessage]);
+            // Add a slight delay before showing the AI response to ensure the loading animation is visible
+            setTimeout(() => {
+              const aiMessage: Message = {
+                id: Date.now().toString(),
+                content: messageContent,
+                sender: 'ai',
+                timestamp: new Date()
+              };
+              setMessages(prev => [...prev, aiMessage]);
+              setIsLoading(false);
+            }, 500);
           } catch (e) {
             console.error('Error processing message:', e);
             const errorMessage: Message = {
@@ -81,7 +90,6 @@ export default function Chat() {
             };
             setMessages(prev => [...prev, errorMessage]);
           }
-          setIsLoading(false);
         };
         
         ws.onerror = (error) => {
@@ -111,6 +119,10 @@ export default function Chat() {
     e.preventDefault();
     if (!input.trim()) return;
 
+    // Set loading state immediately
+    setIsLoading(true);
+    console.log("Setting loading state to true on form submit");
+
     if (!isAuthenticated) {
       const errorMessage: Message = {
         id: Date.now().toString(),
@@ -119,6 +131,7 @@ export default function Chat() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
       return;
     }
 
@@ -131,7 +144,6 @@ export default function Chat() {
 
     setMessages(prev => [...prev, newMessage]);
     setInput('');
-    setIsLoading(true);
 
     try {
       const token = localStorage.getItem('authToken');
@@ -198,8 +210,6 @@ export default function Chat() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -381,24 +391,25 @@ export default function Chat() {
               ))}
             </AnimatePresence>
             
-            {/* Loading indicator */}
+            {/* Loading indicator - improved visibility */}
             {isLoading && (
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="flex items-start gap-4"
+                className="flex items-start gap-4 ml-4 mt-6"
+                data-testid="loading-indicator"
               >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-md">
-                  <BrainCircuit className="h-5 w-5 text-primary" />
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/20 border border-primary/10 flex items-center justify-center shadow-md">
+                  <BrainCircuit className="h-5 w-5 text-primary animate-pulse" />
                 </div>
-                <div className="rounded-2xl px-6 py-4 bg-white border border-slate-200 rounded-tl-none shadow-md">
+                <div className="rounded-2xl px-6 py-4 bg-gradient-to-r from-slate-50 via-white to-slate-50 border border-slate-200 rounded-tl-none shadow-md">
                   <div className="flex items-center gap-3">
                     <div className="flex space-x-1.5">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }}></div>
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }}></div>
-                      <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "0ms" }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "150ms" }}></div>
+                      <div className="w-2.5 h-2.5 rounded-full bg-primary animate-bounce" style={{ animationDelay: "300ms" }}></div>
                     </div>
-                    <span className="text-sm text-slate-500 font-medium">Thinking...</span>
+                    <span className="text-sm text-slate-600 font-medium">Thinking...</span>
                   </div>
                 </div>
               </motion.div>

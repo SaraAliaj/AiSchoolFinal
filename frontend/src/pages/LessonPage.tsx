@@ -75,7 +75,7 @@ export default function LessonPage() {
 
   return (
     <div className="h-screen">
-      <div className="h-[calc(100vh-4rem)]">
+      <div className="h-full">
         <LessonChatbot 
           lessonId={lessonId || ''} 
           lessonTitle={lessonData.title}

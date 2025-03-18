@@ -572,24 +572,9 @@ export default function LessonChatbot({
   };
 
   return (
-    <div className="flex h-screen gap-4 bg-slate-100 p-4">
+    <div className="flex h-screen gap-4 bg-slate-100 p-1">
       {/* PDF Viewer Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-2rem)] bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
-        <div className="flex justify-between items-center p-6 bg-gradient-to-r from-slate-50 to-white border-b">
-          <h2 className="text-xl font-bold flex items-center text-slate-800">
-            <FileText className="mr-3 h-5 w-5 text-primary" />
-            {lessonTitle}
-          </h2>
-          <Button 
-            variant="outline" 
-            className="flex items-center gap-2 hover:bg-slate-50 transition-all duration-200"
-            onClick={() => window.open(api.downloadLessonFile(lessonId), '_blank')}
-          >
-            <Download className="h-4 w-4" />
-            Download PDF
-          </Button>
-        </div>
-        
+      <div className="w-1/2 h-[calc(100vh-1rem)] bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
         {/* PDF Viewer Container */}
         <div className="flex-1 w-full bg-slate-50">
           <embed
@@ -602,7 +587,7 @@ export default function LessonChatbot({
       </div>
 
       {/* Chat Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-2rem)] flex flex-col bg-white rounded-xl shadow-lg overflow-hidden">
+      <div className="w-1/2 h-[calc(100vh-1rem)] flex flex-col bg-white rounded-xl shadow-lg overflow-hidden">
         {/* Chat header */}
         <div className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
           <div className="flex items-center gap-4">
