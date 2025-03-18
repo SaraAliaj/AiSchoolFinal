@@ -1841,9 +1841,55 @@ app.post('/api/lessons/:id/chat', verifyToken, async (req, res) => {
   }
 });
 
-// Add health check endpoint
-app.get('/api/health', (req, res) => {
-  res.status(200).json({ status: 'ok', message: 'Server is running' });
+// Get lead student endpoint
+app.get('/api/lead-student', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await promisePool.query(
+      'SELECT id, username, surname FROM users WHERE role = "lead_student" LIMIT 1'
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No lead student found' });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching lead student:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Get today's lesson endpoint
+app.get('/api/today-lesson', verifyToken, async (req, res) => {
+  try {
+    // Get current day of week (0 = Sunday, 1 = Monday, etc.)
+    const today = new Date().getDay();
+    // Convert to our day_id format (1 = Monday, 2 = Tuesday, etc.)
+    const dayId = today === 0 ? 7 : today;
+    
+    console.log('Fetching lesson for day:', dayId);
+    
+    // Simplified query to get any lesson for this day
+    const query = `
+      SELECT l.title, l.lesson_name
+      FROM lessons l
+      WHERE l.day_id = ?
+      ORDER BY l.week_id ASC, l.order_index ASC
+      LIMIT 1
+    `;
+    
+    const [rows] = await promisePool.query(query, [dayId]);
+    console.log('Query result:', rows);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'No lesson found for today' });
+    }
+    
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error fetching today\'s lesson:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
 });
 
 // Add the personal information endpoint
