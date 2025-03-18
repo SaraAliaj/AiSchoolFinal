@@ -119,9 +119,15 @@ export default function Chat() {
     e.preventDefault();
     if (!input.trim()) return;
 
-    // Set loading state immediately
-    setIsLoading(true);
-    console.log("Setting loading state to true on form submit");
+    // Check if the message is asking about a person
+    const messageLC = input.toLowerCase();
+    const isPersonQuery = messageLC.includes('about') || messageLC.includes('info') || messageLC.includes('who is');
+    
+    // Only set loading state for non-person queries that will use WebSocket
+    if (!isPersonQuery) {
+      setIsLoading(true);
+      console.log("Setting loading state to true on form submit");
+    }
 
     if (!isAuthenticated) {
       const errorMessage: Message = {
@@ -147,10 +153,6 @@ export default function Chat() {
 
     try {
       const token = localStorage.getItem('authToken');
-      
-      // Check if the message is asking about a person
-      const messageLC = input.toLowerCase();
-      const isPersonQuery = messageLC.includes('about') || messageLC.includes('info') || messageLC.includes('who is');
       
       if (isPersonQuery) {
         // Use the HTTP endpoint for personal information lookup
@@ -210,6 +212,7 @@ export default function Chat() {
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      setIsLoading(false);
     }
   };
 
