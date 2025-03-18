@@ -6,6 +6,7 @@ import { Send, Bot, User, Loader2, BrainCircuit, Clock, MessageSquare, Sparkles,
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/server/api";
 
 interface Message {
   id: string;
@@ -16,18 +17,61 @@ interface Message {
 
 export default function Chat() {
   const { user, isAuthenticated } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – your intelligent assistant from Albania! We empower the government to work more efficiently, optimize resources, and provide better services to citizens. Let's shape a more connected and tech-driven future for our beautiful country together! 🚀 ❤️⚫️`,
-      sender: 'ai',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([{
+    id: '1',
+    content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – your intelligent assistant from Albania! We empower the government to work more efficiently, optimize resources, and provide better services to citizens. Let's shape a more connected and tech-driven future for our beautiful country together! 🚀 ❤️⚫️`,
+    sender: 'ai',
+    timestamp: new Date()
+  }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
+
+  // Fetch lead student and today's lesson information
+  useEffect(() => {
+    const fetchInitialInfo = async () => {
+      try {
+        // Get the day name
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const today = days[new Date().getDay()];
+
+        // Fetch lead student
+        const leadStudent = await api.getLeadStudent();
+        if (leadStudent) {
+          let messageContent = `For this week, the lead student is ${leadStudent.username} ${leadStudent.surname}. `;
+          messageContent += `Today is ${today}. `;
+
+          // Add today's lesson info if available
+          try {
+            const todayLesson = await api.getTodayLesson();
+            if (todayLesson && todayLesson.title) {
+              messageContent += `Your lesson for today is: ${todayLesson.title}`;
+            } else {
+              messageContent += `No lessons scheduled for today.`;
+            }
+          } catch (error) {
+            messageContent += `No lessons scheduled for today.`;
+          }
+
+          const combinedMessage = {
+            id: Date.now().toString(),
+            content: messageContent,
+            sender: 'ai' as const,
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, combinedMessage]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch initial information:', error);
+      }
+    };
+
+    // Add a small delay to ensure the welcome message is displayed first
+    setTimeout(() => {
+      fetchInitialInfo();
+    }, 500);
+  }, []);
 
   // Track loading state changes
   useEffect(() => {

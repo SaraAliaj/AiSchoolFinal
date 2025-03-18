@@ -446,6 +446,26 @@ const api = {
       console.error('Failed to save personal info:', error);
       throw error;
     }
+  },
+
+  getLeadStudent: async () => {
+    try {
+      const response = await axiosInstance.get('/lead-student');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch lead student:', error);
+      throw error;
+    }
+  },
+
+  getTodayLesson: async () => {
+    try {
+      const response = await axiosInstance.get('/today-lesson');
+      return response.data;
+    } catch (error) {
+      console.error('Failed to fetch today\'s lesson:', error);
+      throw error;
+    }
   }
 };
 export { api };
