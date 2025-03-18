@@ -8,9 +8,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { User, Book, Code, Database, Brain, Users } from 'lucide-react';
+import { User, Book, Code, Database, Brain, Users, Check, ChevronRight } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/server/api";
+import { motion } from "framer-motion";
 
 interface FormSection {
   id: string;
@@ -29,6 +30,7 @@ const sections: FormSection[] = [
 
 export default function PersonalInfoForm() {
   const [activeSection, setActiveSection] = useState('profile');
+  const [showSaveAnimation, setShowSaveAnimation] = useState({ section: '', show: false });
   const { toast } = useToast();
   const [formData, setFormData] = useState({
     profile: {
@@ -111,6 +113,10 @@ export default function PersonalInfoForm() {
   const handleSaveSection = async (sectionId: string) => {
     try {
       const sectionData = formData[sectionId];
+      
+      // Show save animation
+      setShowSaveAnimation({ section: sectionId, show: true });
+      
       await api.savePersonalInfo(sectionId, sectionData);
 
       toast({
@@ -118,6 +124,12 @@ export default function PersonalInfoForm() {
         description: `${sections.find(s => s.id === sectionId)?.title} data saved successfully.`,
         variant: "default"
       });
+      
+      // Hide save animation after 1.5 seconds
+      setTimeout(() => {
+        setShowSaveAnimation({ section: '', show: false });
+      }, 1500);
+      
     } catch (error) {
       console.error('Error saving section data:', error);
       toast({
@@ -125,6 +137,7 @@ export default function PersonalInfoForm() {
         description: "Failed to save data. Please try again.",
         variant: "destructive"
       });
+      setShowSaveAnimation({ section: '', show: false });
     }
   };
 
@@ -133,9 +146,32 @@ export default function PersonalInfoForm() {
       case 'profile':
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold mb-4">Student Profile</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <User className="w-5 h-5 mr-2 text-primary" /> 
+                Student Profile
+              </motion.h3>
+              {showSaveAnimation.section === 'profile' && showSaveAnimation.show && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
+            <ScrollArea className="h-[calc(100vh-16rem)] pr-4">
             <div className="grid gap-4">
-              <div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                >
                 <Label htmlFor="fullName">Full Name *</Label>
                 <Input
                   id="fullName"
@@ -143,9 +179,14 @@ export default function PersonalInfoForm() {
                   onChange={(e) => handleInputChange('profile', 'fullName', e.target.value)}
                   placeholder="Enter your full name"
                   required
-                />
-              </div>
-              <div>
+                    className="mt-1 transition-all focus:ring-2 focus:ring-primary/30"
+                  />
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
                 <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
@@ -154,18 +195,28 @@ export default function PersonalInfoForm() {
                   onChange={(e) => handleInputChange('profile', 'email', e.target.value)}
                   placeholder="Enter your email address"
                   required
-                />
-              </div>
-              <div>
+                    className="mt-1 transition-all focus:ring-2 focus:ring-primary/30"
+                  />
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
                 <Label htmlFor="phone">Phone Number (Optional)</Label>
                 <Input
                   id="phone"
                   value={formData.profile.phone}
                   onChange={(e) => handleInputChange('profile', 'phone', e.target.value)}
                   placeholder="Enter your phone number"
-                />
-              </div>
-              <div>
+                    className="mt-1 transition-all focus:ring-2 focus:ring-primary/30"
+                  />
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
                 <Label htmlFor="age">Age (Optional)</Label>
                 <Input
                   id="age"
@@ -173,22 +224,38 @@ export default function PersonalInfoForm() {
                   value={formData.profile.age}
                   onChange={(e) => handleInputChange('profile', 'age', e.target.value)}
                   placeholder="Enter your age"
-                />
-              </div>
-              <div>
+                    className="mt-1 transition-all focus:ring-2 focus:ring-primary/30"
+                  />
+                </motion.div>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                >
                 <Label htmlFor="institution">Educational Institution (Optional)</Label>
                 <Input
                   id="institution"
                   value={formData.profile.institution}
                   onChange={(e) => handleInputChange('profile', 'institution', e.target.value)}
                   placeholder="Enter your institution"
+                    className="mt-1 transition-all focus:ring-2 focus:ring-primary/30"
                 />
+                </motion.div>
               </div>
-              <div className="flex justify-end">
-                <Button onClick={() => handleSaveSection('profile')} className="bg-primary text-white">
+            </ScrollArea>
+            
+            <div className="flex justify-end pt-4 border-t mt-4">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button 
+                  onClick={() => handleSaveSection('profile')} 
+                  className="bg-primary text-white shadow-md hover:shadow-lg transition-all duration-300"
+                >
                   Save Profile
                 </Button>
-              </div>
+              </motion.div>
             </div>
           </div>
         );
@@ -196,33 +263,63 @@ export default function PersonalInfoForm() {
       case 'technical':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold mb-4">Technical Computing Skills</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <Code className="w-5 h-5 mr-2 text-primary" /> 
+                Technical Computing Skills
+              </motion.h3>
+              {showSaveAnimation.section === 'technical' && showSaveAnimation.show && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
+            
+            <ScrollArea className="h-[calc(100vh-16rem)] pr-4">
             <div className="space-y-6">
-              <div>
-                <Label>Comfort Level with Technical Computing Tasks</Label>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Comfort Level with Technical Computing Tasks</Label>
                 <RadioGroup
                   value={formData.technical.technicalProficiency}
                   onValueChange={(value) => handleInputChange('technical', 'technicalProficiency', value)}
                   className="grid gap-2 mt-2"
                 >
-                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                     <RadioGroupItem value="highly" id="highly" />
                     <Label htmlFor="highly">Highly Proficient</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                     <RadioGroupItem value="moderately" id="moderately" />
                     <Label htmlFor="moderately">Moderately Proficient</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                     <RadioGroupItem value="limited" id="limited" />
                     <Label htmlFor="limited">Limited Proficiency</Label>
                   </div>
                 </RadioGroup>
-              </div>
-              
-              <div>
-                <Label>Cloud Computing Experience</Label>
-                <div className="flex items-center space-x-2 mt-2">
+                </motion.div>
+                
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Cloud Computing Experience</Label>
+                  <div className="flex items-center space-x-2 mt-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                   <Checkbox 
                     id="cloud"
                     checked={formData.technical.cloudExperience}
@@ -230,11 +327,16 @@ export default function PersonalInfoForm() {
                   />
                   <Label htmlFor="cloud">Experience with Cloud Platforms (AWS, GCP, Azure)</Label>
                 </div>
-              </div>
+                </motion.div>
 
-              <div>
-                <Label>Virtualization Experience</Label>
-                <div className="flex items-center space-x-2 mt-2">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Virtualization Experience</Label>
+                  <div className="flex items-center space-x-2 mt-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                   <Checkbox 
                     id="vm"
                     checked={formData.technical.vmExperience}
@@ -242,13 +344,22 @@ export default function PersonalInfoForm() {
                   />
                   <Label htmlFor="vm">Experience with VMs or Containers (Docker, VMware)</Label>
                 </div>
+                </motion.div>
               </div>
+            </ScrollArea>
 
-              <div className="flex justify-end">
-                <Button onClick={() => handleSaveSection('technical')} className="bg-primary text-white">
+            <div className="flex justify-end pt-4 border-t mt-4">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button 
+                  onClick={() => handleSaveSection('technical')} 
+                  className="bg-primary text-white shadow-md hover:shadow-lg transition-all duration-300"
+                >
                   Save Technical Skills
                 </Button>
-              </div>
+              </motion.div>
             </div>
           </div>
         );
@@ -256,11 +367,36 @@ export default function PersonalInfoForm() {
       case 'programming':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold mb-4">Programming and Development Expertise</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <Book className="w-5 h-5 mr-2 text-primary" /> 
+                Programming and Development Expertise
+              </motion.h3>
+              {showSaveAnimation.section === 'programming' && showSaveAnimation.show && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
             
-            <div>
-              <Label>Programming Experience</Label>
-              <div className="flex items-center space-x-2 mt-2">
+            <ScrollArea className="h-[calc(100vh-16rem)] pr-4">
+              <div className="space-y-6">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Programming Experience</Label>
+                  <div className="flex items-center space-x-2 mt-2 p-2 hover:bg-slate-100 rounded-md transition-colors">
                 <Checkbox 
                   id="hasProgramming"
                   checked={formData.programming.hasProgramming}
@@ -268,35 +404,57 @@ export default function PersonalInfoForm() {
                 />
                 <Label htmlFor="hasProgramming">I have programming experience</Label>
               </div>
-            </div>
+                </motion.div>
 
-            <div className="space-y-4">
-              <Label>Programming Languages and Proficiency Levels</Label>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Programming Languages and Proficiency Levels</Label>
               <div className="grid grid-cols-2 gap-4">
-                {Object.entries(formData.programming.languages).map(([lang, value]) => (
-                  <div key={lang} className="space-y-2">
-                    <Label htmlFor={`lang_${lang}`}>{lang}</Label>
+                    {Object.entries(formData.programming.languages).map(([lang, value], index) => (
+                      <motion.div 
+                        key={lang} 
+                        className="space-y-2"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: 0.2 + (index * 0.05) }}
+                      >
+                        <Label htmlFor={`lang_${lang}`} className="capitalize">{lang}</Label>
                     <select
                       id={`lang_${lang}`}
                       value={value}
                       onChange={(e) => handleNestedInputChange('programming', 'languages', lang, e.target.value)}
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:ring-2 focus:ring-primary/30 transition-all"
                     >
                       <option value="">Select proficiency</option>
                       <option value="beginner">Beginner</option>
                       <option value="intermediate">Intermediate</option>
                       <option value="advanced">Advanced</option>
                     </select>
+                      </motion.div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </motion.div>
 
-            <div className="space-y-4">
-              <Label>Frameworks and Libraries</Label>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label className="font-medium mb-3 block">Frameworks and Libraries</Label>
               <div className="grid grid-cols-2 gap-2">
-                {['React.js', 'Angular', 'Django', 'Flask', 'Node.js', 'Spring Boot'].map((framework) => (
-                  <div key={framework} className="flex items-center space-x-2">
+                    {['React.js', 'Angular', 'Django', 'Flask', 'Node.js', 'Spring Boot'].map((framework, index) => (
+                      <motion.div 
+                        key={framework} 
+                        className="flex items-center space-x-2 p-2 hover:bg-slate-100 rounded-md transition-colors"
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3 + (index * 0.05) }}
+                      >
                     <Checkbox 
                       id={`framework_${framework}`}
                       checked={formData.programming.frameworks.includes(framework)}
@@ -308,26 +466,41 @@ export default function PersonalInfoForm() {
                       }}
                     />
                     <Label htmlFor={`framework_${framework}`}>{framework}</Label>
+                      </motion.div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
+                </motion.div>
 
-            <div className="space-y-2">
-              <Label htmlFor="projectDescription">Project Description (Optional)</Label>
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.4 }}
+                  className="p-4 bg-slate-50 rounded-lg border border-slate-200 shadow-sm"
+                >
+                  <Label htmlFor="projectDescription" className="font-medium mb-3 block">Project Description (Optional)</Label>
               <Textarea
                 id="projectDescription"
                 value={formData.programming.projectDescription}
                 onChange={(e) => handleInputChange('programming', 'projectDescription', e.target.value)}
                 placeholder="Provide a brief overview of a project, including technologies used and its objective"
-                className="min-h-[100px]"
+                    className="min-h-[100px] focus:ring-2 focus:ring-primary/30 transition-all"
               />
+                </motion.div>
             </div>
+            </ScrollArea>
 
-            <div className="flex justify-end">
-              <Button onClick={() => handleSaveSection('programming')} className="bg-primary text-white">
+            <div className="flex justify-end pt-4 border-t mt-4">
+              <motion.div 
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                <Button 
+                  onClick={() => handleSaveSection('programming')} 
+                  className="bg-primary text-white shadow-md hover:shadow-lg transition-all duration-300"
+                >
                 Save Programming Skills
               </Button>
+              </motion.div>
             </div>
           </div>
         );
@@ -510,40 +683,64 @@ export default function PersonalInfoForm() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-slate-50">
-      {/* Sidebar */}
-      <div className="w-64 bg-white border-r shadow-sm">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg text-slate-800">Personal Information</h2>
-          <p className="text-sm text-slate-500 mt-1">Complete your profile details</p>
-        </div>
-        <ScrollArea className="h-full">
-          <div className="p-3">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
-                  activeSection === section.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {section.icon}
-                <span>{section.title}</span>
-              </button>
-            ))}
+    <div className="flex h-screen bg-slate-50 p-6 gap-6">
+      {/* Sidebar wrapper div - full height */}
+      <div className="w-64 h-[calc(100vh-3rem)] overflow-hidden">
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="h-full flex flex-col bg-white rounded-xl shadow-sm border border-slate-200"
+        >
+          {/* Sidebar header */}
+          <div className="p-4 border-b bg-gradient-to-r from-primary/5 to-transparent rounded-t-xl">
+            <h2 className="font-semibold text-lg text-slate-800">Personal Information</h2>
+            <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-md">
+              <p className="text-xs text-blue-700">
+                <strong>Disclaimer:</strong> Student-entered info may be accessible to others via the chatbot. Students can edit or update their info anytime.
+              </p>
+            </div>
           </div>
-        </ScrollArea>
+          
+          {/* Sidebar navigation */}
+          <ScrollArea className="flex-1">
+            <div className="p-3">
+              {sections.map((section) => (
+                <motion.button
+                  key={section.id}
+                  onClick={() => setActiveSection(section.id)}
+                  whileHover={{ x: 3 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    activeSection === section.id
+                      ? 'bg-primary text-primary-foreground shadow-md'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className="flex items-center space-x-3">
+                    {section.icon}
+                    <span>{section.title}</span>
+                  </div>
+                  {activeSection === section.id && (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </motion.button>
+              ))}
+            </div>
+          </ScrollArea>
+        </motion.div>
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-auto">
-        <div className="max-w-3xl mx-auto p-6">
-          <Card className="p-6">
-            {renderSection(activeSection)}
-          </Card>
-        </div>
+      {/* Content wrapper div - full height */}
+      <div className="flex-1 h-[calc(100vh-3rem)] overflow-hidden">
+        <motion.div
+          key={activeSection}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="h-full p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-auto"
+        >
+          {renderSection(activeSection)}
+        </motion.div>
       </div>
     </div>
   );

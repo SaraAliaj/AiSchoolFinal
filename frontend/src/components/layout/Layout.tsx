@@ -740,44 +740,44 @@ export default function Layout() {
                           <Download className="h-4 w-4" />
                           Download PDF
                         </Button>
-                        
-                        {!isLessonActive ? (
-                          <Button 
-                            onClick={handleStartLesson} 
-                            disabled={isLoading || lessonLoading}
+                    
+                    {!isLessonActive ? (
+                      <Button 
+                        onClick={handleStartLesson} 
+                        disabled={isLoading || lessonLoading}
                             className="bg-green-600 hover:bg-green-700 text-white transition-all whitespace-nowrap"
-                          >
-                            {isLoading || lessonLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      >
+                        {isLoading || lessonLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Starting...
-                              </>
-                            ) : (
-                              <>
-                                <PlayCircle className="mr-2 h-4 w-4" />
-                                Start Lesson
-                              </>
-                            )}
-                          </Button>
+                          </>
                         ) : (
-                          <Button 
-                            onClick={handleEndLesson} 
-                            disabled={isLoading || lessonLoading}
-                            className="bg-red-600 hover:bg-red-700 text-white transition-all whitespace-nowrap"
-                          >
-                            {isLoading || lessonLoading ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Ending...
-                              </>
-                            ) : (
-                              <>
-                                <StopCircle className="mr-2 h-4 w-4" />
-                                End Lesson
-                              </>
-                            )}
-                          </Button>
+                          <>
+                            <PlayCircle className="mr-2 h-4 w-4" />
+                            Start Lesson
+                          </>
                         )}
+                      </Button>
+                    ) : (
+                      <Button 
+                        onClick={handleEndLesson} 
+                        disabled={isLoading || lessonLoading}
+                            className="bg-red-600 hover:bg-red-700 text-white transition-all whitespace-nowrap"
+                      >
+                        {isLoading || lessonLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Ending...
+                          </>
+                        ) : (
+                          <>
+                            <StopCircle className="mr-2 h-4 w-4" />
+                            End Lesson
+                          </>
+                        )}
+                      </Button>
+                    )}
                       </div>
                     </div>
                   </div>
@@ -808,7 +808,7 @@ export default function Layout() {
                           Download PDF
                         </Button>
                         
-                        {isLessonActive ? (
+                      {isLessonActive ? (
                           <div className="text-green-700 font-medium flex items-center bg-green-50 px-3 py-1.5 rounded border border-green-200">
                             <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
                             Lesson In Progress
@@ -816,10 +816,10 @@ export default function Layout() {
                         ) : (
                           <div className="text-amber-700 font-medium flex items-center bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
                             <Clock className="h-4 w-4 mr-2 text-amber-600" />
-                            Waiting for Lesson to Begin
+                              Waiting for Lesson to Begin
                           </div>
-                        )}
-                      </div>
+                      )}
+                    </div>
                     </div>
                   </div>
                 </div>
