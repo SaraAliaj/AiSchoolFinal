@@ -10,7 +10,7 @@ async function fixArjelAdminRoleRemote() {
   console.log('Remote database configuration:', {
     host: process.env.RENDER_MYSQL_HOST || 'quiz-database-8ags.onrender.com',
     port: process.env.RENDER_MYSQL_PORT || 3306,
-    user: process.env.RENDER_MYSQL_USER || 'Sara',
+    user: process.env.RENDER_MYSQL_USER || 'root ',
     database: process.env.RENDER_MYSQL_DATABASE || 'aischool',
     hasPassword: !!process.env.RENDER_MYSQL_PASSWORD
   });
@@ -22,8 +22,8 @@ async function fixArjelAdminRoleRemote() {
     connection = await mysql.createConnection({
       host: process.env.RENDER_MYSQL_HOST || 'quiz-database-8ags.onrender.com',
       port: process.env.RENDER_MYSQL_PORT || 3306,
-      user: process.env.RENDER_MYSQL_USER || 'Sara',
-      password: process.env.RENDER_MYSQL_PASSWORD || 'Sara0330!!',
+      user: process.env.RENDER_MYSQL_USER || 'root',
+      password: process.env.RENDER_MYSQL_PASSWORD || 'password',
       database: process.env.RENDER_MYSQL_DATABASE || 'aischool',
       ssl: {
         rejectUnauthorized: false // For SSL connection to Render MySQL

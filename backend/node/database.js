@@ -14,7 +14,7 @@ console.log('Database environment:', {
   host: process.env.DB_HOST || 'quiz-database-8ags.onrender.com',
   port: process.env.DB_PORT || 3306,
   database: process.env.DB_NAME || 'aischool',
-  hasPassword: !!(process.env.DB_PASSWORD || 'Sara0330!!')
+  hasPassword: !!(process.env.DB_PASSWORD || 'password')
 });
 
 // Function to create a connection to MySQL with robust error handling
@@ -48,8 +48,8 @@ export async function createConnection() {
     connection = await mysql.createConnection({
       host: 'quiz-database-8ags.onrender.com',
       port: 3306,
-      user: 'Sara',
-      password: 'Sara0330!!',
+      user: 'root',
+      password: 'password',
       database: 'aischool',
       multipleStatements: true, // Allow multiple SQL statements
       ssl: {
@@ -70,8 +70,8 @@ export async function createConnection() {
       connection = await mysql.createConnection({
         host: 'localhost',
         port: 3306,
-        user: 'Sara',
-        password: 'Sara0330!!',
+        user: 'root',
+        password: 'password',
         database: 'aischool',
         multipleStatements: true // Allow multiple SQL statements
       });
@@ -104,8 +104,8 @@ export const createPool = () => {
     // Development pool config
     host: 'localhost',
     port: 3306,
-    user: 'Sara',
-    password: 'Sara0330!!',
+    user: 'root',
+    password: 'password',
     database: 'aischool',
     waitForConnections: true,
     connectionLimit: 10,

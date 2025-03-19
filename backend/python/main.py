@@ -14,6 +14,8 @@ from fastapi.responses import JSONResponse
 from config import Config
 from pathlib import Path
 import pdf_processor  # Import the pdf_processor module
+import mysql.connector
+from mysql.connector import Error
 
 # Ensure we're loading from the correct .env file
 env_path = Path(__file__).parent / '.env'
@@ -71,7 +73,51 @@ async def list_pdfs():
     
     return {"pdf_count": len(pdf_files), "pdfs": result}
 
-def chat_with_grok(user_input, lesson_id=None):
+def get_chat_history():
+    """Get the most recent chat history without user ID"""
+    connection = get_db_connection()
+    if connection is None:
+        return []
+    
+    try:
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT message, timestamp 
+            FROM chat_history 
+            ORDER BY timestamp DESC
+            LIMIT 10
+            """
+        )
+        history = cursor.fetchall()
+        history.reverse()  # Reverse to get chronological order
+        print(f"Retrieved {len(history)} messages from chat history")
+        return history
+    except Error as e:
+        print(f"Error retrieving chat history: {e}")
+        return []
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
+def format_chat_history(chat_history):
+    formatted_history = []
+    for msg in chat_history:
+        # Split into user/AI messages based on prefix
+        if msg['message'].startswith('AI: '):
+            formatted_history.append({
+                'role': 'assistant',
+                'content': msg['message'][4:]  # Remove 'AI: ' prefix
+            })
+        else:
+            formatted_history.append({
+                'role': 'user',
+                'content': msg['message']
+            })
+    return formatted_history
+
+def chat_with_grok(user_input, lesson_id=None, chat_history=None):
     """Send a request to the Grok API and return the response"""
     try:
         # Get X.AI API key
@@ -79,81 +125,43 @@ def chat_with_grok(user_input, lesson_id=None):
         if not api_key:
             return "Error: X.AI API key not found. Please check your configuration."
 
+        # Format the messages including chat history
+        messages = []
+        
+        # Add chat history if available
+        if chat_history:
+            formatted_history = format_chat_history(chat_history)
+            messages.extend(formatted_history)
+        
+        # Add the current user input
+        messages.append({
+            "role": "user",
+            "content": user_input
+        })
+
         # Get lesson content if lesson_id is provided
         lesson_context = ""
-        lesson_title = ""
-        lesson_pdf_path = ""
-        
         if lesson_id:
             try:
                 print(f"Getting content for lesson ID: {lesson_id}")
                 lesson_data = pdf_processor.getLessonContent(lesson_id)
-                
-                if lesson_data and lesson_data.get('has_pdf', False) and lesson_data.get('content'):
-                    # Get the lesson title and PDF path for better context
-                    lesson_title = lesson_data.get('title', f'Lesson {lesson_id}')
-                    lesson_pdf_path = lesson_data.get('pdf_path', '')
-                    
-                    # Log first 100 chars of the content to help with debugging
-                    content_preview = lesson_data.get('content', '')[:100].replace('\n', ' ').strip()
-                    print(f"PDF content preview: {content_preview}...")
-                    
-                    # Look for an objective in the content - this will help provide better context
-                    objective = ""
-                    raw_content = lesson_data.get('content', '')
-                    objective_match = re.search(r"OBJECTIVE:\s*(.+?)(?:\n\n|\nKEY)", raw_content, re.DOTALL)
-                    if objective_match:
-                        objective = objective_match.group(1).strip()
-                        print(f"Found lesson objective: {objective[:100]}...")
-                    
-                    # Format the lesson content as context for the AI, but allow more flexibility for general questions
+                if lesson_data and lesson_data.get('content'):
                     lesson_context = f"""
-You are a helpful teaching assistant that can answer both lesson-specific questions and general knowledge questions.
-
-LESSON INFORMATION:
-You are discussing "{lesson_title}".
-"""
-                    
-                    # Add objective if found
-                    if objective:
-                        lesson_context += f"""
-The main objective of this lesson is:
-{objective}
-"""
-                    
-                    lesson_context += f"""
-When asked about this specific lesson or topics covered in it, use ONLY the information provided in the lesson content below.
+You are discussing lesson content about: {lesson_data.get('title', f'Lesson {lesson_id}')}
 
 LESSON CONTENT:
---------------------------
-{lesson_data.get('content', 'No content available')}
---------------------------
+{lesson_data.get('content')}
 
-For questions about this lesson (like "What's this lesson about?", "What are the key concepts?", etc.), provide detailed answers using ONLY 
-the information in the lesson content above.
-
-For general questions or questions about topics mentioned in the lesson but not fully covered, you can use your general knowledge 
-while making it clear what information comes directly from the lesson versus your broader knowledge.
-
-IMPORTANT: Do NOT begin your responses with phrases like "From the lesson content:" or "Based on the lesson information:". 
-Just answer directly and conversationally as if you're a teacher helping a student.
-
-USER QUESTION: {user_input}
-
-Remember to be helpful and informative. Answer the question accurately based on the lesson content when possible, but provide helpful
-general information when appropriate.
+Please answer based on this lesson content.
 """
-                    print(f"✅ Added lesson content from PDF for lesson ID: {lesson_id}")
-                else:
-                    print(f"⚠️ No PDF content found for lesson ID: {lesson_id}")
-                    return f"I don't have access to the content for Lesson {lesson_id}. Please ensure a PDF has been uploaded for this lesson."
+                    # Add lesson context as a system message
+                    messages.insert(0, {
+                        "role": "system",
+                        "content": lesson_context
+                    })
             except Exception as e:
-                print(f"❌ Error getting lesson content: {str(e)}")
-                return f"I encountered an error retrieving content for Lesson {lesson_id}: {str(e)}"
+                print(f"Error getting lesson content: {str(e)}")
                 
-        # Use lesson context if available, otherwise just use the user input
-        final_prompt = lesson_context if lesson_context else user_input
-            
         # API endpoint and headers
         url = "https://api.x.ai/v1/chat/completions"
         headers = {
@@ -161,30 +169,25 @@ general information when appropriate.
             "Content-Type": "application/json"
         }
         
-        # Request payload
+        # Request payload with chat history
         data = {
             "model": "grok-beta",
-            "messages": [{"role": "user", "content": final_prompt}],
+            "messages": messages,
             "max_tokens": 1000
         }
         
         print("✅ Making request to Grok API...")
+        print(f"Messages being sent: {json.dumps(messages, indent=2)}")
         
-        # Make the API call using requests
+        # Make the API call
         response = requests.post(url, headers=headers, json=data)
         
-        # Check if request was successful
         if response.status_code == 200:
             print("✅ Received response from Grok API")
             response_data = response.json()
             if response_data and "choices" in response_data and response_data["choices"]:
-                # Get the AI response
-                ai_response = response_data["choices"][0]["message"]["content"]
-                
-                # Return the response without adding the lesson title prefix
-                return ai_response
+                return response_data["choices"][0]["message"]["content"]
         
-        # Handle error cases
         error_msg = f"API Error: {response.status_code}"
         if response.text:
             try:
@@ -220,65 +223,235 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Database configuration
+DB_CONFIG = {
+    'host': 'localhost',
+    'database': 'aischool',
+    'user': 'root',
+    'password': 'password',
+    'port': 3306
+}
+
+def get_db_connection():
+    try:
+        print("Attempting to connect to MySQL database with config:", {
+            **DB_CONFIG,
+            'password': '***'  # Hide password in logs
+        })
+        
+        connection = mysql.connector.connect(**DB_CONFIG)
+        
+        if connection.is_connected():
+            db_info = connection.get_server_info()
+            print(f"Successfully connected to MySQL Server version {db_info}")
+            
+            # Test the connection by executing a simple query
+            cursor = connection.cursor()
+            cursor.execute("SELECT DATABASE()")
+            database_name = cursor.fetchone()[0]
+            print(f"Connected to database: {database_name}")
+            
+            # Test the chat_history table
+            try:
+                cursor.execute("SHOW TABLES LIKE 'chat_history'")
+                if cursor.fetchone():
+                    print("chat_history table exists")
+                    cursor.execute("DESCRIBE chat_history")
+                    columns = cursor.fetchall()
+                    print("chat_history table structure:")
+                    for column in columns:
+                        print(f"- {column[0]}: {column[1]}")
+                else:
+                    print("chat_history table does not exist!")
+                    # Create the table if it doesn't exist
+                    cursor.execute("""
+                        CREATE TABLE IF NOT EXISTS chat_history (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            message TEXT NOT NULL,
+                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )
+                    """)
+                    connection.commit()
+                    print("Created chat_history table")
+            except Error as e:
+                print(f"Error checking chat_history table: {e}")
+            
+            cursor.close()
+            return connection
+        else:
+            print("Failed to establish database connection")
+            return None
+            
+    except Error as e:
+        print(f"Error connecting to MySQL database: {e}")
+        if 'connection' in locals() and connection.is_connected():
+            connection.close()
+        return None
+
+def save_chat_message(message):
+    """Save a chat message without user ID"""
+    if not message or not message.strip():
+        print("Empty message provided, cannot save")
+        return False
+    
+    print(f"Attempting to save message")
+    print(f"Message content (first 100 chars): {message[:100]}")
+    
+    connection = get_db_connection()
+    if connection is None:
+        print("Failed to establish database connection in save_chat_message")
+        return False
+    
+    cursor = None
+    try:
+        cursor = connection.cursor()
+            
+        # Insert the message
+        print(f"Inserting message into chat_history")
+        cursor.execute(
+            """
+            INSERT INTO chat_history (message) 
+            VALUES (%s)
+            """,
+            (message,)
+        )
+        connection.commit()
+        
+        # Verify the insertion
+        last_id = cursor.lastrowid
+        print(f"Message saved successfully. Message ID: {last_id}, Affected rows: {cursor.rowcount}")
+        
+        # Double check the insertion
+        cursor.execute("""
+            SELECT * FROM chat_history
+            WHERE id = %s
+        """, (last_id,))
+        saved_message = cursor.fetchone()
+        if saved_message:
+            print("Message verified in database")
+            return True
+        else:
+            print("Warning: Message not found after insertion")
+            return False
+            
+    except Error as e:
+        print(f"Error saving chat message: {e}")
+        if connection.is_connected():
+            print("Rolling back transaction")
+            connection.rollback()
+        return False
+    except Exception as e:
+        print(f"Unexpected error in save_chat_message: {e}")
+        if connection.is_connected():
+            print("Rolling back transaction")
+            connection.rollback()
+        return False
+    finally:
+        if cursor:
+            cursor.close()
+        if connection.is_connected():
+            connection.close()
+            print("Database connection closed in save_chat_message")
+
 # WebSocket endpoint for chat
 @app.websocket("/grok")
 async def chat_endpoint(websocket: WebSocket):
+    print("\n=== New WebSocket connection attempt ===")
     await manager.connect(websocket)
+    print("WebSocket connection established")
+    
     try:
         while True:
             try:
                 # Receive message
                 data = await websocket.receive_text()
+                print("\n=== New message received ===")
+                print(f"Raw WebSocket data received: {data}")
                 
-                # Check if the received data is JSON with lessonId and message
+                # Parse the JSON data
                 try:
                     json_data = json.loads(data)
                     lesson_id = json_data.get('lessonId')
                     user_input = json_data.get('message')
                     
+                    print("\nParsed message data:")
+                    print(f"- Lesson ID: {lesson_id}")
+                    print(f"- Message: {user_input}")
+                    
                     if not user_input:
+                        error_msg = "Please send a non-empty message"
+                        print(f"Error: {error_msg}")
                         await manager.send_message(
-                            json.dumps({"error": "Please send a non-empty message"}),
+                            json.dumps({"error": error_msg}),
                             websocket
                         )
                         continue
-                except json.JSONDecodeError:
-                    # If not valid JSON, treat the entire message as user input
-                    user_input = data.strip()
-                    lesson_id = None
-                
-                if not user_input:
+                        
+                except json.JSONDecodeError as e:
+                    print(f"JSON decode error: {str(e)}")
+                    print(f"Raw data causing error: {data}")
                     await manager.send_message(
-                        json.dumps({"error": "Please send a non-empty message"}),
+                        json.dumps({"error": "Invalid message format. Please send a properly formatted JSON message."}),
                         websocket
                     )
                     continue
                 
-                print(f"Received chat request. Lesson ID: {lesson_id}, Message: {user_input}")
+                # Save user message and get chat history
+                print("\n=== Processing message ===")
                 
-                # Get response from API with lesson context if available
-                response = chat_with_grok(user_input, lesson_id)
+                print("Saving user message...")
+                save_success = save_chat_message(user_input)
+                if not save_success:
+                    print("Warning: Failed to save user message")
                 
-                # Send response back
+                print("Retrieving chat history...")
+                chat_history = get_chat_history()
+                history_count = len(chat_history) if chat_history else 0
+                print(f"Retrieved {history_count} messages from chat history")
+                
+                print("\n=== Getting AI response ===")
+                print("Calling Grok API...")
+                response = chat_with_grok(user_input, lesson_id, chat_history)
+                print(f"Grok API response received (first 100 chars): {response[:100]}...")
+                
+                # Save AI response
+                print("\n=== Saving AI response ===")
+                ai_save_success = save_chat_message(f"AI: {response}")
+                if not ai_save_success:
+                    print("Warning: Failed to save AI response")
+                
+                # Send response back to client
+                print("\n=== Sending response to client ===")
                 await manager.send_message(
-                    json.dumps({"response": response, "lessonId": lesson_id}),
+                    json.dumps({
+                        "response": response,
+                        "lessonId": lesson_id,
+                        "savedToHistory": ai_save_success
+                    }),
                     websocket
                 )
+                print("Response sent successfully")
                 
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"\n=== JSON Error ===")
+                print(f"JSON decode error in main loop: {str(e)}")
                 await manager.send_message(
                     json.dumps({"error": "Invalid message format"}),
                     websocket
                 )
             except Exception as e:
+                print(f"\n=== Unexpected Error ===")
                 print(f"Error in chat: {str(e)}")
                 await manager.send_message(
                     json.dumps({"error": "An error occurred processing your request"}),
                     websocket
                 )
+                
     except WebSocketDisconnect:
+        print("\n=== WebSocket Disconnected ===")
         manager.disconnect()
     except Exception as e:
+        print(f"\n=== WebSocket Error ===")
         print(f"WebSocket error: {str(e)}")
         try:
             await manager.send_message(
@@ -286,7 +459,7 @@ async def chat_endpoint(websocket: WebSocket):
                 websocket
             )
         except:
-            pass
+            print("Failed to send error message to client")
 
 # Add a health check endpoint
 @app.get("/health")
