@@ -281,12 +281,13 @@ export default function Chat() {
     return content.includes("\n-") || 
            content.includes("\n•") || 
            content.includes("\n1.") ||
-           /\n\d+\.\s/.test(content);
+           /\n\d+\.\s/.test(content) ||
+           content.includes("[object Object]"); // Add check for object notation
   };
   
   // Helper function to render structured content
   const renderStructuredContent = (content: string, isAiMessage: boolean) => {
-    // Check if content contains bullet points or numbered lists
+    // Check if content contains bullet points, numbered lists, or structured data
     if (hasStructure(content)) {
       // Split by newlines first
       const lines = content.split('\n');
@@ -315,6 +316,29 @@ export default function Chat() {
             content: []
           };
         } 
+        // Check if line contains [object Object]
+        else if (line.includes("[object Object]")) {
+          try {
+            // Try to parse the line as JSON
+            const startIndex = line.indexOf("{");
+            const endIndex = line.lastIndexOf("}");
+            if (startIndex !== -1 && endIndex !== -1) {
+              const jsonStr = line.substring(startIndex, endIndex + 1);
+              const obj = JSON.parse(jsonStr);
+              // Format object into readable text
+              const formattedText = Object.entries(obj)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(", ");
+              currentSection.content.push(line.replace("[object Object]", formattedText));
+            } else {
+              // If we can't parse JSON, just add the line without [object Object]
+              currentSection.content.push(line.replace("[object Object]", ""));
+            }
+          } catch (e) {
+            // If JSON parsing fails, just add the line without [object Object]
+            currentSection.content.push(line.replace("[object Object]", ""));
+          }
+        }
         // Check if line is a bullet point or numbered item
         else if (cleanLine.startsWith('- ') || cleanLine.startsWith('• ') || /^\d+\.\s/.test(cleanLine)) {
           // Get the text after the bullet or number
