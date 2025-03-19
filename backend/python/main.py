@@ -117,9 +117,158 @@ def format_chat_history(chat_history):
             })
     return formatted_history
 
+def get_user_info(query):
+    """Get user information based on a natural language query"""
+    connection = get_db_connection()
+    if connection is None:
+        return "Sorry, I couldn't connect to the database."
+    
+    try:
+        cursor = connection.cursor(dictionary=True)
+        
+        # Extract potential email from query
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_match = re.search(email_pattern, query)
+        
+        # Extract potential username from query
+        username_pattern = r'\b(?:what is |what\'s |find |get |show |about )?(\w+)(?:\'s)?\s*(?:email|information|info|details)?'
+        username_match = re.search(username_pattern, query.lower())
+        
+        if email_match:
+            # Search by email
+            email = email_match.group(0)
+            cursor.execute(
+                """
+                SELECT u.*, pi.section_data
+                FROM users u
+                LEFT JOIN personal_information pi ON u.id = pi.user_id
+                WHERE u.email = %s
+                """,
+                (email,)
+            )
+        elif username_match:
+            # Search by username
+            username = username_match.group(1)
+            cursor.execute(
+                """
+                SELECT u.*, pi.section_data
+                FROM users u
+                LEFT JOIN personal_information pi ON u.id = pi.user_id
+                WHERE u.username LIKE %s
+                """,
+                (f"%{username}%",)
+            )
+        else:
+            return "I couldn't understand which user you're asking about. Please specify a username or email."
+        
+        user = cursor.fetchone()
+        if user:
+            status = "active" if user['active'] else "inactive"
+            
+            # Try to parse section_data if it exists
+            additional_info = {}
+            if user.get('section_data'):
+                try:
+                    if isinstance(user['section_data'], str):
+                        section_data = json.loads(user['section_data'])
+                    else:
+                        section_data = user['section_data']
+                        
+                    # Extract programming languages and technical skills
+                    if 'programming' in section_data:
+                        prog_data = section_data['programming']
+                        if isinstance(prog_data, dict):
+                            tech_skills = []
+                            
+                            # Handle technical proficiency
+                            if 'technicalProficiency' in prog_data:
+                                tech_skills.append(f"Technical Proficiency: {prog_data['technicalProficiency']}")
+                            
+                            # Handle cloud experience
+                            if 'cloudExperience' in prog_data:
+                                cloud_exp = "Yes" if prog_data['cloudExperience'] else "No"
+                                tech_skills.append(f"Cloud Experience: {cloud_exp}")
+                            
+                            # Handle VM experience
+                            if 'vmExperience' in prog_data:
+                                vm_exp = "Yes" if prog_data['vmExperience'] else "No"
+                                tech_skills.append(f"VM Experience: {vm_exp}")
+                            
+                            # Handle other technical skills
+                            if 'otherTechnicalSkills' in prog_data and prog_data['otherTechnicalSkills']:
+                                tech_skills.append(f"Other Skills: {prog_data['otherTechnicalSkills']}")
+                            
+                            additional_info['technical_skills'] = tech_skills
+                            
+                            # Handle frameworks
+                            if 'frameworks' in prog_data:
+                                frameworks = prog_data['frameworks']
+                                if isinstance(frameworks, list):
+                                    additional_info['frameworks'] = ', '.join(frameworks)
+                                
+                    # Extract contact info if it exists
+                    if 'contact' in section_data:
+                        contact_data = section_data['contact']
+                        if isinstance(contact_data, dict):
+                            for key, value in contact_data.items():
+                                additional_info[key] = value
+                                
+                    # Extract institution info if it exists
+                    if 'institution' in section_data:
+                        additional_info['institution'] = section_data['institution']
+                        
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing section_data: {e}")
+            
+            # Format the response
+            response = f"📋 User Information for {user['username']}\n\n"
+            response += f"📧 Email: {user['email']}\n"
+            response += f"🎭 Role: {user['role']}\n"
+            response += f"📊 Status: {status}\n\n"
+            
+            if additional_info:
+                if 'phone' in additional_info:
+                    response += f"📱 Phone: {additional_info['phone']}\n"
+                if 'institution' in additional_info:
+                    response += f"🏫 Institution: {additional_info['institution']}\n"
+                
+                # Add technical skills section
+                if 'technical_skills' in additional_info:
+                    response += f"\n💻 Technical Skills:\n"
+                    for skill in additional_info['technical_skills']:
+                        response += f"• {skill}\n"
+                
+                if 'frameworks' in additional_info:
+                    response += f"\n🔧 Frameworks: {additional_info['frameworks']}\n"
+            
+            return response
+        else:
+            return "I couldn't find any user matching your query."
+            
+    except Error as e:
+        print(f"Error querying user information: {e}")
+        return "Sorry, there was an error retrieving the user information."
+    finally:
+        if connection.is_connected():
+            cursor.close()
+            connection.close()
+
 def chat_with_grok(user_input, lesson_id=None, chat_history=None):
     """Send a request to the Grok API and return the response"""
     try:
+        # Check if this is a user information query
+        user_info_keywords = ['email', 'information', 'info', 'details', 'contact']
+        is_user_query = any(keyword in user_input.lower() for keyword in user_info_keywords) and (
+            'what' in user_input.lower() or 
+            'who' in user_input.lower() or
+            'find' in user_input.lower() or
+            'get' in user_input.lower() or
+            'show' in user_input.lower()
+        )
+        
+        if is_user_query:
+            return get_user_info(user_input)
+            
         # Get X.AI API key
         api_key = os.getenv("XAI_API_KEY")
         if not api_key:
