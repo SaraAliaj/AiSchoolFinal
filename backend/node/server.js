@@ -1548,7 +1548,7 @@ const cleanupOnlineStatus = async () => {
 // Add chat endpoints
 app.post('/api/chat', verifyToken, async (req, res) => {
   try {
-    const { message } = req.body;
+    const { message, type } = req.body;
     
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
@@ -1658,56 +1658,103 @@ app.post('/api/chat', verifyToken, async (req, res) => {
 
         console.log(`Processing section ${info.section_name}:`, sectionData);
         
-        switch (info.section_name) {
-          case 'profile':
-            response += '👤 Profile:\n';
-            if (sectionData.bio) response += `• Bio: ${sectionData.bio}\n`;
-            if (sectionData.location) response += `• Location: ${sectionData.location}\n`;
-            if (sectionData.interests) response += `• Interests: ${sectionData.interests}\n`;
-            if (sectionData.phone) response += `• Phone: ${sectionData.phone}\n`;
-            if (sectionData.institution) response += `• Institution: ${sectionData.institution}\n`;
-            if (sectionData.fieldOfStudy) response += `• Field of Study: ${sectionData.fieldOfStudy}\n`;
-            if (sectionData.yearOfStudy) response += `• Year of Study: ${sectionData.yearOfStudy}\n`;
-            response += '\n';
-            break;
-            
-          case 'technical':
-            response += '💻 Technical Skills:\n';
-            if (sectionData.skills) response += `• Skills: ${Array.isArray(sectionData.skills) ? sectionData.skills.join(', ') : sectionData.skills}\n`;
-            if (sectionData.experience) response += `• Experience: ${sectionData.experience}\n`;
-            if (sectionData.operatingSystem) response += `• Operating System: ${sectionData.operatingSystem}\n`;
-            if (sectionData.programmingLanguages) response += `• Programming Languages: ${Array.isArray(sectionData.programmingLanguages) ? sectionData.programmingLanguages.join(', ') : sectionData.programmingLanguages}\n`;
-            if (sectionData.webTechnologies) response += `• Web Technologies: ${Array.isArray(sectionData.webTechnologies) ? sectionData.webTechnologies.join(', ') : sectionData.webTechnologies}\n`;
-            if (sectionData.databases) response += `• Databases: ${Array.isArray(sectionData.databases) ? sectionData.databases.join(', ') : sectionData.databases}\n`;
-            if (sectionData.tools) response += `• Tools: ${Array.isArray(sectionData.tools) ? sectionData.tools.join(', ') : sectionData.tools}\n`;
-            response += '\n';
-            break;
-            
-          case 'programming':
-            response += '🚀 Programming:\n';
-            if (sectionData.languages) response += `• Languages: ${Array.isArray(sectionData.languages) ? sectionData.languages.join(', ') : sectionData.languages}\n`;
-            if (sectionData.frameworks) response += `• Frameworks: ${Array.isArray(sectionData.frameworks) ? sectionData.frameworks.join(', ') : sectionData.frameworks}\n`;
-            if (sectionData.projects) response += `• Projects: ${sectionData.projects}\n`;
-            if (sectionData.experience) response += `• Experience: ${sectionData.experience}\n`;
-            if (sectionData.interests) response += `• Interests: ${sectionData.interests}\n`;
-            response += '\n';
-            break;
+        // Format each section based on the section name
+        if (info.section_name === 'profile') {
+          response += "👤 Profile\n";
+          if (sectionData.phone) response += `📱 Phone: ${sectionData.phone}\n`;
+          if (sectionData.fullName) response += `👤 Full Name: ${sectionData.fullName}\n`;
+          if (sectionData.age) response += `🎂 Age: ${sectionData.age}\n`;
+          if (sectionData.institution) response += `🏫 Institution: ${sectionData.institution}\n`;
+          if (sectionData.fieldOfStudy) response += `📚 Field of Study: ${sectionData.fieldOfStudy}\n`;
+          if (sectionData.yearOfStudy) response += `📅 Year of Study: ${sectionData.yearOfStudy}\n`;
+          if (sectionData.linkedIn) response += `💼 LinkedIn: ${sectionData.linkedIn}\n`;
+          response += "\n";
         }
-      } catch (error) {
-        console.error(`Error processing section ${info.section_name}:`, error);
-        // Continue with other sections if one fails
-        continue;
+        else if (info.section_name === 'technical') {
+          response += "💻 Technical Skills\n";
+          if (sectionData.technicalProficiency) response += `• Technical Proficiency: ${sectionData.technicalProficiency}\n`;
+          if ('cloudExperience' in sectionData) response += `• Cloud Experience: ${sectionData.cloudExperience ? 'Yes' : 'No'}\n`;
+          if ('vmExperience' in sectionData) response += `• VM Experience: ${sectionData.vmExperience ? 'Yes' : 'No'}\n`;
+          if (sectionData.otherTechnicalSkills) response += `• Other Skills: ${sectionData.otherTechnicalSkills}\n`;
+          response += "\n";
+        }
+        else if (info.section_name === 'programming') {
+          response += "🚀 Programming\n";
+          
+          // Format programming languages
+          if (sectionData.languages && typeof sectionData.languages === 'object') {
+            const languages = [];
+            // Extract non-empty languages with their proficiency levels
+            for (const [lang, level] of Object.entries(sectionData.languages)) {
+              if (level && typeof level === 'string' && level.trim()) {
+                languages.push(`${lang}: ${level}`);
+              }
+            }
+            if (languages.length > 0) {
+              response += `• Languages: ${languages.join(', ')}\n`;
+            }
+          }
+          
+          // Format frameworks
+          if (sectionData.frameworks && Array.isArray(sectionData.frameworks) && sectionData.frameworks.length > 0) {
+            response += `• Frameworks: ${sectionData.frameworks.join(', ')}\n`;
+          }
+          
+          // Add project description
+          if (sectionData.projectDescription) {
+            response += `• Project Experience: ${sectionData.projectDescription}\n`;
+          }
+          
+          // Add IDEs
+          if (sectionData.ides && Array.isArray(sectionData.ides) && sectionData.ides.length > 0) {
+            response += `• IDEs: ${sectionData.ides.join(', ')}\n`;
+          }
+          
+          // Add open source info
+          if ('hasOpenSource' in sectionData) {
+            response += `• Open Source Contribution: ${sectionData.hasOpenSource ? 'Yes' : 'No'}\n`;
+          }
+          
+          response += "\n";
+        }
+        else if (info.section_name === 'database') {
+          response += "🗄️ Database Skills\n";
+          if (sectionData.databaseSystems && Array.isArray(sectionData.databaseSystems) && sectionData.databaseSystems.length > 0) {
+            response += `• Database Systems: ${sectionData.databaseSystems.join(', ')}\n`;
+          }
+          if (sectionData.apiTechnologies) response += `• API Technologies: ${sectionData.apiTechnologies}\n`;
+          if (sectionData.otherDatabases) response += `• Other Databases: ${sectionData.otherDatabases}\n`;
+          if ('hasBackendExperience' in sectionData) response += `• Backend Experience: ${sectionData.hasBackendExperience ? 'Yes' : 'No'}\n`;
+          response += "\n";
+        }
+        else if (info.section_name === 'ai') {
+          response += "🤖 AI & Emerging Tech\n";
+          if (sectionData.aiExperience) response += `• AI Experience Level: ${sectionData.aiExperience}\n`;
+          if (sectionData.tools && Array.isArray(sectionData.tools) && sectionData.tools.length > 0) {
+            response += `• AI Tools: ${sectionData.tools.join(', ')}\n`;
+          }
+          if (sectionData.otherTools) response += `• Other AI Tools: ${sectionData.otherTools}\n`;
+          if ('hasML' in sectionData) response += `• Machine Learning: ${sectionData.hasML ? 'Yes' : 'No'}\n`;
+          if ('hasAIModels' in sectionData) response += `• AI Model Development: ${sectionData.hasAIModels ? 'Yes' : 'No'}\n`;
+          response += "\n";
+        }
+        else if (info.section_name === 'collaboration') {
+          response += "👥 Collaboration\n";
+          if (sectionData.collaborationRole) response += `• Role: ${sectionData.collaborationRole}\n`;
+          if (sectionData.competitionExperience) response += `• Competition Experience: ${sectionData.competitionExperience}\n`;
+          if ('hasCompetitions' in sectionData) response += `• Competitions: ${sectionData.hasCompetitions ? 'Yes' : 'No'}\n`;
+          if (sectionData.additionalInfo) response += `• Additional Info: ${sectionData.additionalInfo}\n`;
+          response += "\n";
+        }
+      } catch (e) {
+        console.error(`Error processing section ${info.section_name}:`, e);
       }
     }
 
-    console.log('Sending response:', response);
-    return res.json({ response });
-
+    return res.json({ response: response.trim() });
   } catch (error) {
     console.error('Error in chat endpoint:', error);
-    return res.status(500).json({
-      response: 'Sorry, I encountered an error while processing your request. Please try again.'
-    });
+    return res.status(500).json({ error: 'An error occurred processing your request' });
   }
 });
 

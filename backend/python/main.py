@@ -139,9 +139,8 @@ def get_user_info(query):
             email = email_match.group(0)
             cursor.execute(
                 """
-                SELECT u.*, pi.section_data
+                SELECT u.id, u.username, u.email, u.role, u.active
                 FROM users u
-                LEFT JOIN personal_information pi ON u.id = pi.user_id
                 WHERE u.email = %s
                 """,
                 (email,)
@@ -151,9 +150,8 @@ def get_user_info(query):
             username = username_match.group(1)
             cursor.execute(
                 """
-                SELECT u.*, pi.section_data
+                SELECT u.id, u.username, u.email, u.role, u.active
                 FROM users u
-                LEFT JOIN personal_information pi ON u.id = pi.user_id
                 WHERE u.username LIKE %s
                 """,
                 (f"%{username}%",)
@@ -162,88 +160,146 @@ def get_user_info(query):
             return "I couldn't understand which user you're asking about. Please specify a username or email."
         
         user = cursor.fetchone()
-        if user:
-            status = "active" if user['active'] else "inactive"
-            
-            # Try to parse section_data if it exists
-            additional_info = {}
-            if user.get('section_data'):
-                try:
-                    if isinstance(user['section_data'], str):
-                        section_data = json.loads(user['section_data'])
-                    else:
-                        section_data = user['section_data']
-                        
-                    # Extract programming languages and technical skills
-                    if 'programming' in section_data:
-                        prog_data = section_data['programming']
-                        if isinstance(prog_data, dict):
-                            tech_skills = []
-                            
-                            # Handle technical proficiency
-                            if 'technicalProficiency' in prog_data:
-                                tech_skills.append(f"Technical Proficiency: {prog_data['technicalProficiency']}")
-                            
-                            # Handle cloud experience
-                            if 'cloudExperience' in prog_data:
-                                cloud_exp = "Yes" if prog_data['cloudExperience'] else "No"
-                                tech_skills.append(f"Cloud Experience: {cloud_exp}")
-                            
-                            # Handle VM experience
-                            if 'vmExperience' in prog_data:
-                                vm_exp = "Yes" if prog_data['vmExperience'] else "No"
-                                tech_skills.append(f"VM Experience: {vm_exp}")
-                            
-                            # Handle other technical skills
-                            if 'otherTechnicalSkills' in prog_data and prog_data['otherTechnicalSkills']:
-                                tech_skills.append(f"Other Skills: {prog_data['otherTechnicalSkills']}")
-                            
-                            additional_info['technical_skills'] = tech_skills
-                            
-                            # Handle frameworks
-                            if 'frameworks' in prog_data:
-                                frameworks = prog_data['frameworks']
-                                if isinstance(frameworks, list):
-                                    additional_info['frameworks'] = ', '.join(frameworks)
-                                
-                    # Extract contact info if it exists
-                    if 'contact' in section_data:
-                        contact_data = section_data['contact']
-                        if isinstance(contact_data, dict):
-                            for key, value in contact_data.items():
-                                additional_info[key] = value
-                                
-                    # Extract institution info if it exists
-                    if 'institution' in section_data:
-                        additional_info['institution'] = section_data['institution']
-                        
-                except json.JSONDecodeError as e:
-                    print(f"Error parsing section_data: {e}")
-            
-            # Format the response
-            response = f"📋 User Information for {user['username']}\n\n"
-            response += f"📧 Email: {user['email']}\n"
-            response += f"🎭 Role: {user['role']}\n"
-            response += f"📊 Status: {status}\n\n"
-            
-            if additional_info:
-                if 'phone' in additional_info:
-                    response += f"📱 Phone: {additional_info['phone']}\n"
-                if 'institution' in additional_info:
-                    response += f"🏫 Institution: {additional_info['institution']}\n"
-                
-                # Add technical skills section
-                if 'technical_skills' in additional_info:
-                    response += f"\n💻 Technical Skills:\n"
-                    for skill in additional_info['technical_skills']:
-                        response += f"• {skill}\n"
-                
-                if 'frameworks' in additional_info:
-                    response += f"\n🔧 Frameworks: {additional_info['frameworks']}\n"
-            
-            return response
-        else:
+        if not user:
             return "I couldn't find any user matching your query."
+
+        # Get the basic user info
+        user_id = user['id']
+        status = "active" if user['active'] else "inactive"
+        
+        # Initialize response
+        response = f"📋 Student Information for {user['username']}\n\n"
+        response += f"📧 Email: {user['email']}\n"
+        response += f"🎭 Role: {user['role']}\n"
+        response += f"📊 Status: {status}\n\n"
+
+        # Now fetch all sections for the user
+        cursor.execute(
+            """
+            SELECT section_name, section_data
+            FROM personal_information
+            WHERE user_id = %s
+            """,
+            (user_id,)
+        )
+        
+        sections_rows = cursor.fetchall()
+        sections_data = {}
+        
+        # Process each section
+        for row in sections_rows:
+            if row['section_data'] and row['section_name']:
+                try:
+                    if isinstance(row['section_data'], str):
+                        section_data = json.loads(row['section_data'])
+                    else:
+                        section_data = row['section_data']
+                    sections_data[row['section_name']] = section_data
+                except json.JSONDecodeError:
+                    continue
+
+        # Format profile section
+        if 'profile' in sections_data:
+            response += "👤 Profile\n"
+            profile = sections_data['profile']
+            if profile.get('phone'):
+                response += f"📱 Phone: {profile['phone']}\n"
+            if profile.get('institution'):
+                response += f"🏫 Institution: {profile['institution']}\n"
+            if profile.get('fullName'):
+                response += f"👤 Full Name: {profile['fullName']}\n"
+            if profile.get('age'):
+                response += f"🎂 Age: {profile['age']}\n"
+            if profile.get('fieldOfStudy'):
+                response += f"📚 Field of Study: {profile['fieldOfStudy']}\n"
+            if profile.get('yearOfStudy'):
+                response += f"📅 Year of Study: {profile['yearOfStudy']}\n"
+            if profile.get('linkedIn'):
+                response += f"💼 LinkedIn: {profile['linkedIn']}\n"
+            response += "\n"
+
+        # Format technical section
+        if 'technical' in sections_data:
+            response += "💻 Technical Skills\n"
+            tech = sections_data['technical']
+            if tech.get('technicalProficiency'):
+                response += f"• Technical Proficiency: {tech['technicalProficiency']}\n"
+            if 'cloudExperience' in tech:
+                response += f"• Cloud Experience: {'Yes' if tech['cloudExperience'] else 'No'}\n"
+            if 'vmExperience' in tech:
+                response += f"• VM Experience: {'Yes' if tech['vmExperience'] else 'No'}\n"
+            if tech.get('otherTechnicalSkills'):
+                response += f"• Other Skills: {tech['otherTechnicalSkills']}\n"
+            response += "\n"
+
+        # Format programming section
+        if 'programming' in sections_data:
+            response += "🚀 Programming\n"
+            prog = sections_data['programming']
+            if prog.get('languages'):
+                langs = prog['languages']
+                if isinstance(langs, dict):
+                    lang_list = []
+                    for lang, level in langs.items():
+                        if level and level.strip():  # Only include languages with a non-empty level
+                            lang_list.append(f"{lang}: {level}")
+                    if lang_list:
+                        response += f"• Languages: {', '.join(lang_list)}\n"
+            if prog.get('frameworks') and isinstance(prog['frameworks'], list) and prog['frameworks']:
+                response += f"• Frameworks: {', '.join(prog['frameworks'])}\n"
+            if prog.get('projectDescription'):
+                response += f"• Project Experience: {prog['projectDescription']}\n"
+            if prog.get('ides') and isinstance(prog['ides'], list) and prog['ides']:
+                response += f"• IDEs: {', '.join(prog['ides'])}\n"
+            if 'hasOpenSource' in prog:
+                response += f"• Open Source Contribution: {'Yes' if prog['hasOpenSource'] else 'No'}\n"
+            response += "\n"
+
+        # Format database section
+        if 'database' in sections_data:
+            response += "🗄️ Database Skills\n"
+            db = sections_data['database']
+            if db.get('databaseSystems') and isinstance(db['databaseSystems'], list) and db['databaseSystems']:
+                response += f"• Database Systems: {', '.join(db['databaseSystems'])}\n"
+            if db.get('apiTechnologies'):
+                response += f"• API Technologies: {db['apiTechnologies']}\n"
+            if db.get('otherDatabases'):
+                response += f"• Other Databases: {db['otherDatabases']}\n"
+            if 'hasBackendExperience' in db:
+                response += f"• Backend Experience: {'Yes' if db['hasBackendExperience'] else 'No'}\n"
+            response += "\n"
+
+        # Format AI section
+        if 'ai' in sections_data:
+            response += "🤖 AI & Emerging Tech\n"
+            ai = sections_data['ai']
+            if ai.get('aiExperience'):
+                response += f"• AI Experience Level: {ai['aiExperience']}\n"
+            if ai.get('tools') and isinstance(ai['tools'], list) and ai['tools']:
+                response += f"• AI Tools: {', '.join(ai['tools'])}\n"
+            if ai.get('otherTools'):
+                response += f"• Other AI Tools: {ai['otherTools']}\n"
+            if 'hasML' in ai:
+                response += f"• Machine Learning: {'Yes' if ai['hasML'] else 'No'}\n"
+            if 'hasAIModels' in ai:
+                response += f"• AI Model Development: {'Yes' if ai['hasAIModels'] else 'No'}\n"
+            response += "\n"
+
+        # Format collaboration section
+        if 'collaboration' in sections_data:
+            response += "👥 Collaboration\n"
+            collab = sections_data['collaboration']
+            if collab.get('collaborationRole'):
+                response += f"• Role: {collab['collaborationRole']}\n"
+            if collab.get('competitionExperience'):
+                response += f"• Competition Experience: {collab['competitionExperience']}\n"
+            if 'hasCompetitions' in collab:
+                response += f"• Competitions: {'Yes' if collab['hasCompetitions'] else 'No'}\n"
+            if collab.get('additionalInfo'):
+                response += f"• Additional Info: {collab['additionalInfo']}\n"
+            response += "\n"
+
+        return response.strip()
             
     except Error as e:
         print(f"Error querying user information: {e}")
