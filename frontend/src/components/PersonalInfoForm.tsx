@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,10 +8,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { User, Book, Code, Database, Brain, Users, Check, ChevronRight } from 'lucide-react';
+import { User, Book, Code, Database, Brain, Users, Check, ChevronRight, Loader2 } from 'lucide-react';
 import { useToast } from "@/components/ui/use-toast";
 import { api } from "@/server/api";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface FormSection {
   id: string;
@@ -31,7 +32,9 @@ const sections: FormSection[] = [
 export default function PersonalInfoForm() {
   const [activeSection, setActiveSection] = useState('profile');
   const [showSaveAnimation, setShowSaveAnimation] = useState({ section: '', show: false });
+  const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     profile: {
       fullName: '',
@@ -86,6 +89,63 @@ export default function PersonalInfoForm() {
       additionalInfo: ''
     }
   });
+
+  // Load user's existing data when component mounts
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user?.id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        const response = await api.getPersonalInfo();
+        
+        if (response) {
+          // Update form data with existing user data for each section
+          setFormData(prevData => ({
+            ...prevData,
+            profile: {
+              ...prevData.profile,
+              ...response.profile
+            },
+            technical: {
+              ...prevData.technical,
+              ...response.technical
+            },
+            programming: {
+              ...prevData.programming,
+              ...response.programming
+            },
+            database: {
+              ...prevData.database,
+              ...response.database
+            },
+            ai: {
+              ...prevData.ai,
+              ...response.ai
+            },
+            collaboration: {
+              ...prevData.collaboration,
+              ...response.collaboration
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load your information. Please try again later.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [user?.id]);
 
   const handleInputChange = (section: string, field: string, value: any) => {
     setFormData(prev => ({
@@ -737,9 +797,18 @@ export default function PersonalInfoForm() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="h-full p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-auto"
+          className="h-full p-6 bg-white rounded-xl shadow-sm border border-slate-200 overflow-auto relative"
         >
-          {renderSection(activeSection)}
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/80">
+              <div className="flex flex-col items-center space-y-4">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-sm text-slate-600">Loading your information...</p>
+              </div>
+            </div>
+          ) : (
+            renderSection(activeSection)
+          )}
         </motion.div>
       </div>
     </div>
