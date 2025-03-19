@@ -9,10 +9,10 @@ const getWebSocketUrl = () => {
   // Use appropriate ports based on environment
   // For local development
   if (host === 'localhost' || host === '127.0.0.1') {
-    return `ws://${host}:8765/ws`;  // Updated port to match Python server
+    return `ws://${host}:8081/grok`;
   }
   // For production deployment (assuming secure WebSocket)
-  return `wss://${window.location.host}/ws`;
+  return `wss://${window.location.host}/grok`;
 };
 
 const ChatBot = ({ lessonId }) => {
@@ -27,15 +27,27 @@ const ChatBot = ({ lessonId }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('connecting'); // Changed to start in connecting state
-  const [useWebSocket, setUseWebSocket] = useState(true);  // Default to attempt using WebSocket
+  const [connectionStatus, setConnectionStatus] = useState('connecting');
   const socketRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   
   const messagesEndRef = useRef(null);
   const chatContainerRef = useRef(null);
 
-  // Function to connect to WebSocket with reconnection logic
+  useEffect(() => {
+    console.log('Initializing chat...');
+    connectWebSocket();
+    
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const connectWebSocket = () => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       console.log('WebSocket already connected');
@@ -44,15 +56,14 @@ const ChatBot = ({ lessonId }) => {
     
     try {
       setConnectionStatus('connecting');
-      console.log('Attempting to connect to WebSocket at', getWebSocketUrl());
-      const ws = new WebSocket(getWebSocketUrl());
+      const wsUrl = getWebSocketUrl();
+      console.log('Attempting to connect to WebSocket at', wsUrl);
+      const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         console.log('WebSocket connection established');
-        setUseWebSocket(true);
         setConnectionStatus('connected');
         
-        // Clear any pending reconnect timeout
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
           reconnectTimeoutRef.current = null;
@@ -62,13 +73,19 @@ const ChatBot = ({ lessonId }) => {
       ws.onmessage = (event) => {
         console.log('WebSocket message received:', event.data);
         try {
-          // Try to parse as JSON
           const jsonData = JSON.parse(event.data);
           
+          if (jsonData.error) {
+            console.error('Server error:', jsonData.error);
+            setError(jsonData.error);
+            setIsLoading(false);
+            return;
+          }
+
           // Add response to chat
           const botMessage = {
             id: Date.now().toString(),
-            text: jsonData.message || jsonData.error || event.data,
+            text: jsonData.response || jsonData.error || event.data,
             sender: 'bot',
             timestamp: new Date(),
             error: !!jsonData.error
@@ -77,15 +94,8 @@ const ChatBot = ({ lessonId }) => {
           setMessages(prev => [...prev, botMessage]);
           setIsLoading(false);
         } catch (e) {
-          // If not JSON, use raw text
-          const botMessage = {
-            id: Date.now().toString(),
-            text: event.data,
-            sender: 'bot',
-            timestamp: new Date()
-          };
-          
-          setMessages(prev => [...prev, botMessage]);
+          console.error('Error parsing server response:', e);
+          setError('Error parsing server response');
           setIsLoading(false);
         }
       };
@@ -93,20 +103,20 @@ const ChatBot = ({ lessonId }) => {
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
         setConnectionStatus('error');
-        // Will trigger reconnect via the onclose handler
+        setError('WebSocket connection error');
       };
       
-      ws.onclose = (event) => {
-        console.log('WebSocket connection closed:', event.code, event.reason);
+      ws.onclose = () => {
+        console.log('WebSocket connection closed');
         setConnectionStatus('error');
         
         // Try to reconnect after a delay
         if (!reconnectTimeoutRef.current) {
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectTimeoutRef.current = null;
-            console.log('Attempting to reconnect WebSocket...');
+            console.log('Attempting to reconnect...');
             connectWebSocket();
-          }, 3000); // 3 second delay before trying to reconnect
+          }, 3000);
         }
       };
       
@@ -114,78 +124,17 @@ const ChatBot = ({ lessonId }) => {
     } catch (error) {
       console.error('Failed to establish WebSocket connection:', error);
       setConnectionStatus('error');
-      
-      // Try to reconnect after a delay
-      if (!reconnectTimeoutRef.current) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          reconnectTimeoutRef.current = null;
-          console.log('Attempting to reconnect WebSocket after error...');
-          connectWebSocket();
-        }, 3000);
-      }
+      setError('Failed to establish WebSocket connection');
     }
-  };
-
-  // Initialize WebSocket
-  useEffect(() => {
-    connectWebSocket();
-    
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.close();
-      }
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Scroll to bottom whenever messages change
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages]);
-
-  // Monitor connection status and try to reconnect if needed
-  useEffect(() => {
-    const checkConnection = async () => {
-      try {
-        setConnectionStatus('connecting');
-        await api.checkHealth();
-        setConnectionStatus('connected');
-      } catch (error) {
-        console.error('Connection error:', error);
-        setConnectionStatus('error');
-        // Try to reconnect after 5 seconds
-        setTimeout(checkConnection, 5000);
-      }
-    };
-
-    if (connectionStatus === 'error') {
-      checkConnection();
-    }
-
-    // Initial connection check
-    if (connectionStatus !== 'connected') {
-      checkConnection();
-    }
-  }, [connectionStatus]);
-
-  const handleInputChange = (e) => {
-    setInputValue(e.target.value);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!inputValue.trim()) return;
 
-    // Add user message to chat
     const userMessage = {
       id: Date.now().toString(),
-      text: inputValue,
+      text: inputValue.trim(),
       sender: 'user',
       timestamp: new Date()
     };
@@ -196,266 +145,86 @@ const ChatBot = ({ lessonId }) => {
     setError(null);
 
     try {
-      // Try WebSocket first if available
-      if (useWebSocket && socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-        // Format message as JSON for WebSocket - using the correct format expected by the server
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
         const messageData = {
-          lessonId: lessonId || '1',  // Default to lesson 1 if not specified
+          lessonId: lessonId || '1',
           message: userMessage.text
         };
         
+        console.log('Sending WebSocket message:', messageData);
         socketRef.current.send(JSON.stringify(messageData));
-        console.log('Message sent via WebSocket:', messageData);
-        // The response will be handled by the onmessage event
-        return;
-      }
-      
-      // Fall back to HTTP API if WebSocket is not available
-      console.log('Using HTTP API fallback - WebSocket not available');
-      let response;
-      
-      // Use the appropriate API method based on whether we have a lessonId
-      if (lessonId) {
-        response = await api.sendLessonChatMessage(lessonId, userMessage.text);
       } else {
-        response = await api.sendChatMessage(userMessage.text);
+        console.error('WebSocket not connected. State:', socketRef.current?.readyState);
+        throw new Error('WebSocket connection not available');
       }
-
-      // Add bot response to chat
-      const botMessage = {
-        id: (Date.now() + 1).toString(), // Ensure unique ID
-        text: response.response,
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, botMessage]);
-      setConnectionStatus('connected');
     } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Add error message to chat
-      const errorMessage = {
-        id: (Date.now() + 1).toString(),
-        text: "I'm sorry, I'm having trouble connecting to the server. Please try again later.",
-        sender: 'bot',
-        error: true,
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, errorMessage]);
-      setError(error.message);
-      setConnectionStatus('error');
-      
-      // Try to reconnect WebSocket if it's the source of the error
-      if (useWebSocket) {
-        connectWebSocket();
-      }
-    } finally {
+      console.error('Failed to send message:', error);
+      setError('Failed to send message. Please try again.');
       setIsLoading(false);
     }
   };
 
-  // Render each message
-  const renderMessage = (message) => {
-    const { id, text, sender, error: isError, timestamp } = message;
-    const isBot = sender === 'bot';
-    const time = new Intl.DateTimeFormat('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    }).format(timestamp);
-
-    // Check if the message is structured (JSON object)
-    let structuredContent = null;
-    if (typeof text === 'object') {
-      structuredContent = text;
-    } else if (typeof text === 'string') {
-      try {
-        // Try to parse as JSON if it's a string that might be JSON
-        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
-          structuredContent = JSON.parse(text);
-        }
-      } catch (e) {
-        // Not valid JSON, continue with text rendering
-      }
-    }
-
-    // Render structured content if available
-    if (structuredContent && structuredContent.type) {
-      return (
-        <div
-          key={id}
-          className={`flex mb-4 ${isBot ? 'justify-start' : 'justify-end'}`}
-        >
-          <div
-            className={`flex max-w-[80%] rounded-lg p-4 ${
-              isBot
-                ? 'bg-white border border-gray-200 shadow-sm'
-                : 'bg-primary text-white'
-            }`}
-          >
-            <div className="flex-shrink-0 mr-3">
-              {isBot ? (
-                <Sparkles className="h-5 w-5 text-primary" />
-              ) : (
-                <User className="h-5 w-5 text-white" />
-              )}
-            </div>
-            <div className="flex flex-col w-full">
-              {structuredContent.title && (
-                <h3 className={`text-lg font-semibold ${isBot ? 'text-primary' : 'text-white'} border-b pb-2 mb-3`}>
-                  {structuredContent.title}
-                </h3>
-              )}
-              
-              {/* Render sections if available */}
-              {structuredContent.sections && structuredContent.sections.map((section, index) => (
-                <div key={index} className={`bg-gray-50 rounded-lg p-4 border-l-4 ${isBot ? 'border-primary' : 'border-white/70'} shadow-sm mb-3`}>
-                  <h4 className={`font-medium ${isBot ? 'text-primary' : 'text-white'} mb-2`}>{section.heading}</h4>
-                  {Array.isArray(section.content) ? (
-                    <ul className="space-y-2">
-                      {section.content.map((item, i) => (
-                        <li key={i} className="text-sm text-gray-700 leading-relaxed pl-2 border-l-2 border-gray-300 ml-2">
-                          {item}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-sm text-gray-700 leading-relaxed">
-                      {/* Split text by line breaks and render each line separately */}
-                      {section.content.split('\n').map((line, i) => (
-                        line.trim() ? (
-                          <p key={i} className="mb-2">{line}</p>
-                        ) : null
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              {/* Render question/answer if available */}
-              {structuredContent.question && (
-                <div className="bg-primary/10 rounded-lg p-4 border-l-4 border-primary shadow-sm mb-3">
-                  <h4 className="font-medium text-primary mb-2">Question</h4>
-                  <p className="text-sm text-gray-700 font-medium">{structuredContent.question}</p>
-                </div>
-              )}
-              
-              {structuredContent.answer && (
-                <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-green-500 shadow-sm mb-3">
-                  <h4 className="font-medium text-green-600 mb-2">Answer</h4>
-                  <div className="text-sm text-gray-700 leading-relaxed">
-                    {/* Split answer by line breaks and render each line separately */}
-                    {structuredContent.answer.split('\n').map((line, i) => (
-                      line.trim() ? (
-                        <p key={i} className="mb-2">{line}</p>
-                      ) : null
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-white/80'}`}>
-                {time}
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // Default rendering for plain text messages
-    return (
-      <div
-        key={id}
-        className={`flex mb-4 ${isBot ? 'justify-start' : 'justify-end'}`}
-      >
-        <div
-          className={`flex max-w-[80%] rounded-lg p-4 ${
-            isBot
-              ? 'bg-gray-100 text-gray-800'
-              : 'bg-primary text-white'
-          } ${isError ? 'bg-red-100 border border-red-300 text-red-500' : ''}`}
-        >
-          <div className="flex-shrink-0 mr-3">
-            {isBot ? (
-              <Sparkles className="h-5 w-5 text-primary" />
-            ) : (
-              <User className="h-5 w-5 text-white" />
-            )}
-          </div>
-          <div className="flex flex-col">
-            <div className="whitespace-pre-line">
-              {/* Split text by line breaks and render each line separately */}
-              {text.split('\n').map((line, i) => (
-                line.trim() ? (
-                  <p key={i} className="mb-2">{line}</p>
-                ) : null
-              ))}
-            </div>
-            <div className={`text-xs mt-1 ${isBot ? 'text-gray-500' : 'text-primary-foreground/80'}`}>
-              {time}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const handleInputChange = (e) => {
+    setInputValue(e.target.value);
   };
 
   return (
     <div className="flex flex-col h-full">
-      {/* Connection status */}
       {connectionStatus === 'error' && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-md mb-4">
-          Connection error. Trying to reconnect...
+        <div className="bg-red-100 text-red-600 px-4 py-2 mb-4">
+          Connection error. Attempting to reconnect...
         </div>
       )}
-      
-      {/* Chat messages container */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto mb-4 px-4 py-2"
-      >
-        <div className="space-y-4">
-          {messages.map(renderMessage)}
-          
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex items-center text-gray-500 mb-4">
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              <span>AI is thinking...</span>
+      <div className="flex-1 overflow-y-auto p-4" ref={chatContainerRef}>
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex ${
+              message.sender === 'user' ? 'justify-end' : 'justify-start'
+            } mb-4`}
+          >
+            <div
+              className={`max-w-[70%] rounded-lg p-3 ${
+                message.sender === 'user'
+                  ? 'bg-primary text-white'
+                  : 'bg-gray-100'
+              }`}
+            >
+              <p>{message.text}</p>
             </div>
-          )}
-          
-          {/* Error message */}
-          {error && (
-            <div className="text-red-500 mb-4">
-              Error: {error}
+          </div>
+        ))}
+        {isLoading && (
+          <div className="flex justify-start mb-4">
+            <div className="bg-gray-100 rounded-lg p-3">
+              <Loader2 className="h-5 w-5 animate-spin" />
             </div>
-          )}
-          
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
+        )}
+        {error && (
+          <div className="flex justify-center mb-4">
+            <div className="bg-red-100 text-red-600 rounded-lg p-3">
+              {error}
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
       
-      {/* Message input */}
-      <form 
-        onSubmit={handleSubmit}
-        className="border-t border-gray-200 p-4"
-      >
-        <div className="flex items-center">
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        <div className="flex gap-2">
           <input
             type="text"
             value={inputValue}
             onChange={handleInputChange}
             placeholder="Type your message..."
-            className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="flex-1 p-2 border rounded-lg"
             disabled={isLoading || connectionStatus === 'error'}
           />
           <button
             type="submit"
-            className="bg-primary text-white rounded-r-lg px-4 py-2 ml-0 hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-gray-300 disabled:cursor-not-allowed"
             disabled={isLoading || !inputValue.trim() || connectionStatus === 'error'}
+            className="bg-primary text-white px-4 py-2 rounded-lg disabled:opacity-50"
           >
             {isLoading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
