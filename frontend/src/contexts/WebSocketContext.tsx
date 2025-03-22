@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import LessonNotification from '../components/LessonNotification';
+import { useToast } from '@/components/ui/use-toast';
 
 interface WebSocketContextType {
     sendMessage: (message: string) => void;
@@ -38,10 +38,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
     role 
 }) => {
     const [ws, setWs] = useState<WebSocket | null>(null);
-    const [notification, setNotification] = useState<NotificationData | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
     const maxReconnectAttempts = 5;
+    const { toast } = useToast();
 
     // Create a function to establish websocket connection
     const connectWebSocket = useCallback(() => {
@@ -84,25 +84,29 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
                 try {
                     const data = JSON.parse(event.data);
                     if (data.type === 'lesson_start_notification') {
-                        setNotification({
-                            message: data.message,
-                            type: 'start'
+                        toast({
+                            title: "Lesson Started",
+                            description: data.message,
+                            variant: "default",
                         });
                     } else if (data.type === 'lesson_started') {
-                        setNotification({
-                            message: `Lesson started by ${data.user_name || 'a lead student'}`,
-                            type: 'start'
+                        toast({
+                            title: "Lesson Started",
+                            description: `Lesson started by ${data.user_name || 'a lead student'}`,
+                            variant: "default",
                         });
                     } else if (data.type === 'lesson_ended') {
-                        setNotification({
-                            message: `Lesson ended by ${data.user_name || 'a lead student'}`,
-                            type: 'end'
+                        toast({
+                            title: "Lesson Ended",
+                            description: `Lesson ended by ${data.user_name || 'a lead student'}`,
+                            variant: "default",
                         });
                     } else if (data.type === 'error') {
                         console.error('WebSocket error:', data.message);
-                        setNotification({
-                            message: `Error: ${data.message}`,
-                            type: 'info'
+                        toast({
+                            title: "Error",
+                            description: data.message,
+                            variant: "destructive",
                         });
                     } else if (data.type === 'confirmation') {
                         console.log('WebSocket confirmation:', data.message);
@@ -129,19 +133,20 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
                     return () => clearTimeout(timeoutId);
                 } else {
                     console.log('Maximum reconnection attempts reached.');
-                    setNotification({
-                        message: 'Connection lost. Please refresh the page.',
-                        type: 'info'
+                    toast({
+                        title: "Connection Lost",
+                        description: "Please refresh the page to reconnect.",
+                        variant: "destructive",
                     });
                 }
             };
 
             socket.onerror = (error) => {
                 console.error('WebSocket Error:', error);
-                // Display user-friendly error notification
-                setNotification({
-                    message: 'Connection error occurred. The server might be unavailable.',
-                    type: 'info'
+                toast({
+                    title: "Connection Error",
+                    description: "The server might be unavailable. Please try again later.",
+                    variant: "destructive",
                 });
             };
 
@@ -155,13 +160,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             };
         } catch (error) {
             console.error('Error creating WebSocket connection:', error);
-            setNotification({
-                message: 'Failed to establish WebSocket connection. Please refresh.',
-                type: 'info'
+            toast({
+                title: "Connection Error",
+                description: "Failed to establish connection. Please refresh the page.",
+                variant: "destructive",
             });
             return () => {}; // Empty cleanup function
         }
-    }, [userId, username, role, reconnectAttempts, maxReconnectAttempts]);
+    }, [userId, username, role, reconnectAttempts, maxReconnectAttempts, toast]);
 
     // Set up the WebSocket connection when the component mounts
     useEffect(() => {
@@ -174,9 +180,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             ws.send(message);
         } else {
             console.error('Cannot send message, WebSocket is not connected');
-            setNotification({
-                message: 'Cannot send message, connection lost. Please refresh.',
-                type: 'info'
+            toast({
+                title: "Connection Error",
+                description: "Cannot send message, connection lost. Please refresh.",
+                variant: "destructive",
             });
         }
     };
@@ -189,9 +196,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             }));
         } else {
             console.error('Cannot start lesson, WebSocket is not connected');
-            setNotification({
-                message: 'Cannot start lesson, connection lost. Please refresh.',
-                type: 'info'
+            toast({
+                title: "Connection Error",
+                description: "Cannot start lesson, connection lost. Please refresh.",
+                variant: "destructive",
             });
         }
     };
@@ -204,9 +212,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             }));
         } else {
             console.error('Cannot end lesson, WebSocket is not connected');
-            setNotification({
-                message: 'Cannot end lesson, connection lost. Please refresh.',
-                type: 'info'
+            toast({
+                title: "Connection Error",
+                description: "Cannot end lesson, connection lost. Please refresh.",
+                variant: "destructive",
             });
         }
     };
@@ -220,13 +229,6 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({
             isConnected 
         }}>
             {children}
-            {notification && (
-                <LessonNotification
-                    message={notification.message}
-                    type={notification.type}
-                    onClose={() => setNotification(null)}
-                />
-            )}
         </WebSocketContext.Provider>
     );
 }; 
