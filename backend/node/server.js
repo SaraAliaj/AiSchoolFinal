@@ -1554,11 +1554,159 @@ app.post('/api/chat', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Extract name from message using a more robust pattern
-    let searchTerm = '';
     const messageLC = message.toLowerCase();
-    
-    // Handle different message patterns
+
+    // Check for skill-based queries first
+    if (messageLC.includes('who') || messageLC.includes('student') || messageLC.includes('anyone')) {
+      // Programming language query
+      if (messageLC.includes('java') || messageLC.includes('python') || messageLC.includes('javascript') || messageLC.includes('programming')) {
+        let language = '';
+        if (messageLC.includes('java') && !messageLC.includes('javascript')) language = 'java';
+        else if (messageLC.includes('python')) language = 'python';
+        else if (messageLC.includes('javascript')) language = 'javascript';
+
+        if (language) {
+          const [users] = await promisePool.query(`
+            SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+            FROM users u
+            JOIN personal_information p ON u.id = p.user_id
+            WHERE p.section_name = 'programming'
+            AND JSON_EXTRACT(p.section_data, '$.languages.${language}') IS NOT NULL
+            AND JSON_EXTRACT(p.section_data, '$.languages.${language}') != ''
+          `);
+
+          if (users.length > 0) {
+            const response = `💻 Found ${users.length} student(s) with ${language.charAt(0).toUpperCase() + language.slice(1)} experience:
+
+${users.map(user => {
+  const progData = JSON.parse(user.section_data);
+  return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  📊 Level: ${progData.languages[language].toUpperCase()}`
+}).join('\n\n')}`;
+            return res.json({ response });
+          } else {
+            return res.json({ 
+              response: `I couldn't find any students with ${language.charAt(0).toUpperCase() + language.slice(1)} experience in the database.`
+            });
+          }
+        }
+      }
+
+      // Python skill query
+      if (messageLC.includes('python') || messageLC.includes('advanced python') || messageLC.includes('experienced in python')) {
+        const [users] = await promisePool.query(`
+          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+          FROM users u
+          JOIN personal_information p ON u.id = p.user_id
+          WHERE p.section_name = 'programming'
+          AND JSON_EXTRACT(p.section_data, '$.languages.python') = 'advanced'
+        `);
+
+        if (users.length > 0) {
+          const response = `📊 Found ${users.length} student(s) advanced in Python:
+
+${users.map(user => `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}`).join('\n\n')}`;
+          return res.json({ response });
+        }
+      }
+
+      // AI experience query
+      if (messageLC.includes('ai') || messageLC.includes('artificial intelligence') || messageLC.includes('machine learning')) {
+        const [users] = await promisePool.query(`
+          SELECT DISTINCT u.username, u.surname, u.email, 
+                 p_ai.section_data as ai_data,
+                 p_prog.section_data as prog_data
+          FROM users u
+          JOIN personal_information p_ai ON u.id = p_ai.user_id
+          LEFT JOIN personal_information p_prog ON u.id = p_prog.user_id AND p_prog.section_name = 'programming'
+          WHERE p_ai.section_name = 'ai'
+          AND (
+            JSON_EXTRACT(p_ai.section_data, '$.aiExperience') IN ('advanced', 'practical')
+            OR JSON_EXTRACT(p_ai.section_data, '$.hasML') = true
+            OR JSON_EXTRACT(p_ai.section_data, '$.hasAIModels') = true
+          )
+        `);
+
+        if (users.length > 0) {
+          const response = `🤖 Found ${users.length} student(s) with AI experience:
+
+${users.map(user => {
+  const aiData = JSON.parse(user.ai_data);
+  return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  🎯 AI Experience: ${aiData.aiExperience || 'Not specified'}
+  🧠 Machine Learning: ${aiData.hasML ? '✓' : '×'}
+  🔬 AI Model Development: ${aiData.hasAIModels ? '✓' : '×'}
+  ${aiData.tools ? `🛠️ Tools: ${aiData.tools.join(', ')}` : ''}`
+}).join('\n\n')}`;
+          return res.json({ response });
+        }
+      }
+
+      // Database experience query
+      if (messageLC.includes('database') || messageLC.includes('sql') || messageLC.includes('mysql')) {
+        const [users] = await promisePool.query(`
+          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+          FROM users u
+          JOIN personal_information p ON u.id = p.user_id
+          WHERE p.section_name = 'database'
+          AND JSON_EXTRACT(p.section_data, '$.databaseSystems') IS NOT NULL
+        `);
+
+        if (users.length > 0) {
+          const response = `💾 Found ${users.length} student(s) with database experience:
+
+${users.map(user => {
+  const dbData = JSON.parse(user.section_data);
+  return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  🗄️ Database Systems: ${dbData.databaseSystems.join(', ')}`
+}).join('\n\n')}`;
+          return res.json({ response });
+        }
+      }
+
+      // Cloud experience query
+      if (messageLC.includes('cloud') || messageLC.includes('aws') || messageLC.includes('azure')) {
+        const [users] = await promisePool.query(`
+          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+          FROM users u
+          JOIN personal_information p ON u.id = p.user_id
+          WHERE p.section_name = 'technical'
+          AND JSON_EXTRACT(p.section_data, '$.cloudExperience') = true
+        `);
+
+        if (users.length > 0) {
+          const response = `☁️ Found ${users.length} student(s) with cloud experience:
+
+${users.map(user => `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}`).join('\n\n')}`;
+          return res.json({ response });
+        }
+      }
+
+      // If no specific skill matches were found but it was a skill query
+      if (messageLC.includes('experience') || messageLC.includes('skilled') || messageLC.includes('advanced')) {
+        return res.json({
+          response: `I can help you find students with specific skills! Try asking about:
+• Python expertise
+• AI/Machine Learning experience
+• Database knowledge
+• Cloud computing experience
+
+For example:
+"Who is advanced in Python?"
+"Are there any students with AI experience?"
+"Show me students who know databases"
+"Who has cloud computing experience?"`
+        });
+      }
+    }
+
+    // If not a skill query, proceed with the existing name search logic
+    let searchTerm = '';
     if (messageLC.includes('about')) {
       searchTerm = messageLC.split('about')[1].trim();
     } else if (messageLC.includes('info')) {
@@ -1630,128 +1778,58 @@ app.post('/api/chat', verifyToken, async (req, res) => {
       });
     }
 
-    // Format the response in a more readable way
-    let response = `📋 Student Information for ${user.username} ${user.surname || ''}\n`;
-    response += `📧 Email: ${user.email || 'Not provided'}\n\n`;
+    let response = `
+👤 STUDENT PROFILE
 
-    // Process each section with proper error handling
-    for (const info of personalInfo) {
-      try {
-        let sectionData;
-        
-        // Handle the section data based on its type
-        if (typeof info.section_data === 'string' && info.section_data.startsWith('{')) {
-          try {
-            sectionData = JSON.parse(info.section_data);
-          } catch (e) {
-            console.log(`Warning: Could not parse JSON for section ${info.section_name}:`, e);
-            continue;
-          }
-        } else {
-          sectionData = info.section_data;
-        }
 
-        if (!sectionData) {
-          console.log(`Warning: No data for section ${info.section_name}`);
-          continue;
-        }
+🔹 Name: ${user.username.toUpperCase()} ${user.surname ? user.surname.toUpperCase() : ''}
+🔹 Email: ${user.email || 'Not provided'}
+🔹 Phone: ${personalInfo.find(s => s.section_name === 'profile')?.section_data?.phone || 'Not provided'}
+🔹 Age: ${personalInfo.find(s => s.section_name === 'profile')?.section_data?.age || 'Not provided'}
 
-        console.log(`Processing section ${info.section_name}:`, sectionData);
-        
-        // Format each section based on the section name
-        if (info.section_name === 'profile') {
-          response += "👤 Profile\n";
-          if (sectionData.phone) response += `📱 Phone: ${sectionData.phone}\n`;
-          if (sectionData.fullName) response += `👤 Full Name: ${sectionData.fullName}\n`;
-          if (sectionData.age) response += `🎂 Age: ${sectionData.age}\n`;
-          if (sectionData.institution) response += `🏫 Institution: ${sectionData.institution}\n`;
-          if (sectionData.fieldOfStudy) response += `📚 Field of Study: ${sectionData.fieldOfStudy}\n`;
-          if (sectionData.yearOfStudy) response += `📅 Year of Study: ${sectionData.yearOfStudy}\n`;
-          if (sectionData.linkedIn) response += `💼 LinkedIn: ${sectionData.linkedIn}\n`;
-          response += "\n";
-        }
-        else if (info.section_name === 'technical') {
-          response += "💻 Technical Skills\n";
-          if (sectionData.technicalProficiency) response += `• Technical Proficiency: ${sectionData.technicalProficiency}\n`;
-          if ('cloudExperience' in sectionData) response += `• Cloud Experience: ${sectionData.cloudExperience ? 'Yes' : 'No'}\n`;
-          if ('vmExperience' in sectionData) response += `• VM Experience: ${sectionData.vmExperience ? 'Yes' : 'No'}\n`;
-          if (sectionData.otherTechnicalSkills) response += `• Other Skills: ${sectionData.otherTechnicalSkills}\n`;
-          response += "\n";
-        }
-        else if (info.section_name === 'programming') {
-          response += "🚀 Programming\n";
-          
-          // Format programming languages
-          if (sectionData.languages && typeof sectionData.languages === 'object') {
-            const languages = [];
-            // Extract non-empty languages with their proficiency levels
-            for (const [lang, level] of Object.entries(sectionData.languages)) {
-              if (level && typeof level === 'string' && level.trim()) {
-                languages.push(`${lang}: ${level}`);
-              }
-            }
-            if (languages.length > 0) {
-              response += `• Languages: ${languages.join(', ')}\n`;
-            }
-          }
-          
-          // Format frameworks
-          if (sectionData.frameworks && Array.isArray(sectionData.frameworks) && sectionData.frameworks.length > 0) {
-            response += `• Frameworks: ${sectionData.frameworks.join(', ')}\n`;
-          }
-          
-          // Add project description
-          if (sectionData.projectDescription) {
-            response += `• Project Experience: ${sectionData.projectDescription}\n`;
-          }
-          
-          // Add IDEs
-          if (sectionData.ides && Array.isArray(sectionData.ides) && sectionData.ides.length > 0) {
-            response += `• IDEs: ${sectionData.ides.join(', ')}\n`;
-          }
-          
-          // Add open source info
-          if ('hasOpenSource' in sectionData) {
-            response += `• Open Source Contribution: ${sectionData.hasOpenSource ? 'Yes' : 'No'}\n`;
-          }
-          
-          response += "\n";
-        }
-        else if (info.section_name === 'database') {
-          response += "🗄️ Database Skills\n";
-          if (sectionData.databaseSystems && Array.isArray(sectionData.databaseSystems) && sectionData.databaseSystems.length > 0) {
-            response += `• Database Systems: ${sectionData.databaseSystems.join(', ')}\n`;
-          }
-          if (sectionData.apiTechnologies) response += `• API Technologies: ${sectionData.apiTechnologies}\n`;
-          if (sectionData.otherDatabases) response += `• Other Databases: ${sectionData.otherDatabases}\n`;
-          if ('hasBackendExperience' in sectionData) response += `• Backend Experience: ${sectionData.hasBackendExperience ? 'Yes' : 'No'}\n`;
-          response += "\n";
-        }
-        else if (info.section_name === 'ai') {
-          response += "🤖 AI & Emerging Tech\n";
-          if (sectionData.aiExperience) response += `• AI Experience Level: ${sectionData.aiExperience}\n`;
-          if (sectionData.tools && Array.isArray(sectionData.tools) && sectionData.tools.length > 0) {
-            response += `• AI Tools: ${sectionData.tools.join(', ')}\n`;
-          }
-          if (sectionData.otherTools) response += `• Other AI Tools: ${sectionData.otherTools}\n`;
-          if ('hasML' in sectionData) response += `• Machine Learning: ${sectionData.hasML ? 'Yes' : 'No'}\n`;
-          if ('hasAIModels' in sectionData) response += `• AI Model Development: ${sectionData.hasAIModels ? 'Yes' : 'No'}\n`;
-          response += "\n";
-        }
-        else if (info.section_name === 'collaboration') {
-          response += "👥 Collaboration\n";
-          if (sectionData.collaborationRole) response += `• Role: ${sectionData.collaborationRole}\n`;
-          if (sectionData.competitionExperience) response += `• Competition Experience: ${sectionData.competitionExperience}\n`;
-          if ('hasCompetitions' in sectionData) response += `• Competitions: ${sectionData.hasCompetitions ? 'Yes' : 'No'}\n`;
-          if (sectionData.additionalInfo) response += `• Additional Info: ${sectionData.additionalInfo}\n`;
-          response += "\n";
-        }
-      } catch (e) {
-        console.error(`Error processing section ${info.section_name}:`, e);
-      }
-    }
+🧠 TECHNICAL SKILLS
+----------------------
 
-    return res.json({ response: response.trim() });
+💻 Programming Languages:
+${Object.entries(personalInfo.find(s => s.section_name === 'programming')?.section_data?.languages || {})
+  .filter(([_, level]) => level)
+  .map(([lang, level]) => `  • ${lang} (${level.toUpperCase()})`)
+  .join('\n') || '  • No programming languages specified'}
+
+🧱 Development Stack:
+${personalInfo.find(s => s.section_name === 'programming')?.section_data?.frameworks?.map(framework => 
+  `  • ${framework}`).join('\n') || '  • No frameworks specified'}
+
+📊 Technical Level: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.technicalProficiency?.toUpperCase() || 'Not specified'}
+
+🤖 AI & DATA ENGINEERING
+----------------------
+
+🎯 AI Experience: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.aiExperience?.toUpperCase() || 'None'}
+🔎 Machine Learning: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.hasML ? '✅' : '❌'}
+🧪 Model Development: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.hasAIModels ? '✅' : '❌'}
+
+🛠️ AI Tools:
+${personalInfo.find(s => s.section_name === 'ai')?.section_data?.tools?.map(tool => 
+  `  • ${tool}`).join('\n') || '  • No AI tools specified'}
+
+🗃️ Databases:
+${personalInfo.find(s => s.section_name === 'database')?.section_data?.databaseSystems?.map(db => 
+  `  • ${db}`).join('\n') || '  • No database systems specified'}
+
+💼 PROFESSIONAL EXPERIENCE
+----------------------
+
+🤝 Team Role: ${personalInfo.find(s => s.section_name === 'collaboration')?.section_data?.collaborationRole?.toUpperCase() || 'Not specified'}
+🏆 Competitions: ${personalInfo.find(s => s.section_name === 'collaboration')?.section_data?.hasCompetitions ? '✅' : '❌'}
+
+☁️ Cloud Computing: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.cloudExperience ? '✅' : '❌'}
+📦 VM/Container Usage: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.vmExperience ? '✅' : '❌'}
+🌐 Open Source Contributions: ${personalInfo.find(s => s.section_name === 'programming')?.section_data?.hasOpenSource ? '✅' : '❌'}
+`;
+
+return res.json({ response: response.trim() });
+
   } catch (error) {
     console.error('Error in chat endpoint:', error);
     return res.status(500).json({ error: 'An error occurred processing your request' });
