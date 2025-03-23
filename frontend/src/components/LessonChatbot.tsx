@@ -148,11 +148,6 @@ export default function LessonChatbot({
       
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        toast({
-          title: "Connection Error",
-          description: "WebSocket connection error. Please ensure the server is running and refresh the page.",
-          variant: "destructive",
-        });
         setIsLoading(false);
       };
       
@@ -160,10 +155,6 @@ export default function LessonChatbot({
         console.log('WebSocket connection closed');
         socketRef.current = null;
         setTimeout(() => {
-          toast({
-            title: "Reconnecting",
-            description: "Attempting to reconnect to the server...",
-          });
           tryConnect();
         }, 3000);
       };
