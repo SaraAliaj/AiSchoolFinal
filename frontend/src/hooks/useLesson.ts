@@ -3,9 +3,14 @@ import { useWebSocket } from '@/contexts/WebSocketContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/components/ui/use-toast';
 
+interface LessonInfo {
+  userName: string;
+  lessonName: string;
+}
+
 interface UseLesson {
-  startLesson: (lessonId: string) => void;
-  endLesson: (lessonId: string) => void;
+  startLesson: (lessonId: string, info: LessonInfo) => void;
+  endLesson: (lessonId: string, info: LessonInfo) => void;
   loading: boolean;
 }
 
@@ -14,7 +19,7 @@ export const useLesson = (): UseLesson => {
   const { startLesson: wsStartLesson, endLesson: wsEndLesson, isConnected } = useWebSocket();
   const { user } = useAuth();
 
-  const startLesson = (lessonId: string) => {
+  const startLesson = (lessonId: string, info: LessonInfo) => {
     if (!user) {
       toast({
         title: "Error",
@@ -35,7 +40,7 @@ export const useLesson = (): UseLesson => {
 
     setLoading(true);
     try {
-      wsStartLesson(lessonId, user.username);
+      wsStartLesson(lessonId, info.userName, info.lessonName);
     } catch (error) {
       toast({
         title: "Error",
@@ -47,7 +52,7 @@ export const useLesson = (): UseLesson => {
     }
   };
 
-  const endLesson = (lessonId: string) => {
+  const endLesson = (lessonId: string, info: LessonInfo) => {
     if (!user) {
       toast({
         title: "Error",
@@ -68,7 +73,7 @@ export const useLesson = (): UseLesson => {
 
     setLoading(true);
     try {
-      wsEndLesson(lessonId, user.username);
+      wsEndLesson(lessonId, info.userName, info.lessonName);
     } catch (error) {
       toast({
         title: "Error",

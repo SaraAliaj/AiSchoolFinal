@@ -109,10 +109,12 @@ const NotificationDialog = ({ type, data, onOpenChange, open }: NotificationDial
           type === "start" ? "text-green-700" : "text-red-700"
         )}>
           {type === "start" 
-            ? "A new lesson has started:" 
-            : "The lesson has ended:"}
+            ? "A new lesson has started" 
+            : "The lesson has ended"}
         </p>
-        <p className="text-xl font-bold mt-2">{data?.lessonName}</p>
+        <div className="space-y-2">
+          <p className="text-xl font-bold">{data?.lessonName}</p>
+        </div>
       </div>
     </DialogContent>
   </Dialog>
@@ -136,13 +138,8 @@ export default function Layout() {
   const [lessonStartedBy, setLessonStartedBy] = useState<string | null>(null);
   const [selectedDuration, setSelectedDuration] = useState<string>('');
   const { startLesson, endLesson, loading: lessonLoading } = useLesson();
-  const { socket, isConnected } = useWebSocket();
+  const { isConnected, showStartNotification, showEndNotification, notificationData, setShowStartNotification, setShowEndNotification } = useWebSocket();
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-  const [showStartNotification, setShowStartNotification] = useState(false);
-  const [showEndNotification, setShowEndNotification] = useState(false);
-  const [notificationData, setNotificationData] = useState<{lessonName: string, duration?: number}>({
-    lessonName: ''
-  });
   const [showLessonStartPopup, setShowLessonStartPopup] = useState(false);
 
   const handleSignOut = () => {
@@ -257,53 +254,6 @@ export default function Layout() {
     return match ? match[1] : null;
   };
 
-  // Add a function to directly test WebSocket connection
-  const testWebSocketConnection = () => {
-    if (!socket) {
-      toast({
-        title: "WebSocket Not Available",
-        description: "WebSocket connection is not available.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      if (socket.readyState === WebSocket.OPEN) {
-        console.log("Testing WebSocket connection directly...");
-        const message = {
-          type: 'test_message',
-          message: 'Testing WebSocket connection',
-          timestamp: new Date().toISOString()
-        };
-        socket.send(JSON.stringify(message));
-        
-        toast({
-          title: "Test Message Sent",
-          description: "WebSocket test message sent successfully. Check console for details.",
-          variant: "default",
-        });
-      } else {
-        toast({
-          title: "WebSocket Not Connected",
-          description: `WebSocket is in state: ${
-            socket.readyState === WebSocket.CONNECTING ? 'CONNECTING' :
-            socket.readyState === WebSocket.CLOSING ? 'CLOSING' :
-            socket.readyState === WebSocket.CLOSED ? 'CLOSED' : 'UNKNOWN'
-          }`,
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error("Error testing WebSocket:", error);
-      toast({
-        title: "WebSocket Test Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
   // Update the handleStartLesson function to include a WebSocket test check 
   const handleStartLesson = async () => {
     // Get lesson ID from either activeLesson or from URL
@@ -318,19 +268,16 @@ export default function Layout() {
       return;
     }
 
+    if (!user?.username) {
+      toast({
+        title: "Error",
+        description: "User information not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      // First check if WebSocket is connected properly
-      if (!socket || socket.readyState !== WebSocket.OPEN) {
-        testWebSocketConnection();
-        toast({
-          title: "Connection Issue",
-          description: "Attempting to ensure WebSocket connection before starting lesson...",
-          variant: "default",
-        });
-        // Wait briefly for the WebSocket to potentially connect
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-      
       setIsLoading(true);
       // If we don't have the active lesson object but have the ID, create a minimal lesson object
       const currentLesson = activeLesson || { 
@@ -339,38 +286,36 @@ export default function Layout() {
         time: new Date().toLocaleTimeString()
       };
       
-      await startLesson(lessonId);
+      // Start the lesson using the WebSocket context
+      await startLesson(lessonId, {
+        userName: user.username,
+        lessonName: currentLesson.name
+      });
+      
       setIsLessonActive(true);
       setActiveLessonId(lessonId);
-      setLessonStartedBy(user?.username || 'Lead Student');
+      setLessonStartedBy(user.username);
       
       // Also set the activeLesson if it's not already set
       if (!activeLesson) {
         setActiveLesson(currentLesson);
       }
       
-      // Show notification for the lead student
-      setNotificationData({
-        lessonName: currentLesson.name
-      });
-      setShowStartNotification(true);
-      
-      toast({
-        title: "Success",
-        description: "Lesson started successfully",
-        variant: "default",
-      });
-      
-      console.log(`Lesson ${lessonId} started by ${user?.username}`);
+      console.log(`Lesson ${lessonId} started by ${user.username}`);
     } catch (error) {
       console.error("Failed to start lesson:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start lesson",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleEndLesson = async () => {
-    if (!activeLessonId) {
+    if (!activeLessonId || !activeLesson?.name) {
       toast({
         title: "Error",
         description: "No active lesson to end",
@@ -379,86 +324,67 @@ export default function Layout() {
       return;
     }
 
+    if (!user?.username) {
+      toast({
+        title: "Error",
+        description: "User information not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
-      setIsLoading(true); // Set local loading state
-      await endLesson(activeLessonId);
+      setIsLoading(true);
+      // End the lesson using the WebSocket context
+      await endLesson(activeLessonId, {
+        userName: user.username,
+        lessonName: activeLesson.name
+      });
+      
       setIsLessonActive(false);
       setActiveLessonId(null);
-      
-      // Show notification for the lead student
-      setNotificationData({
-        lessonName: activeLesson?.name || 'Current Lesson'
-      });
-      setShowEndNotification(true);
       setActiveLesson(null);
       setLessonStartedBy(null);
     } catch (error) {
       console.error("Failed to end lesson:", error);
+      toast({
+        title: "Error",
+        description: "Failed to end lesson",
+        variant: "destructive",
+      });
     } finally {
-      setIsLoading(false); // Clear local loading state
+      setIsLoading(false);
     }
   };
 
-  // Add socket message handling for lesson events
+  // Remove all socket-related code and simplify the useEffect
   useEffect(() => {
-    if (!socket) return;
+    if (!isConnected || !user) return;
 
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("WebSocket message received:", data);
-
-        if (data.type === 'lesson_started') {
-          console.log("Lesson started event received");
-          setIsLessonActive(true);
-          setActiveLessonId(data.lesson_id?.toString());
-          setLessonStartedBy(data.user_name || 'Lead Student');
-          
-          // Show popup for students only
-          if (user?.role === 'student') {
-            setShowLessonStartPopup(true);
-          }
-
-          // Show toast notification
-          toast({
-            title: "Lesson Started",
-            description: `${data.user_name || 'A lead student'} has started lesson ${data.lesson_id}`,
-            variant: "default",
-          });
-        } 
-        else if (data.type === 'lesson_ended') {
-          console.log("Lesson ended event received");
-          setIsLessonActive(false);
-          
-          // Find the lesson with this ID if possible
-          const lessonName = findLessonName(data.lesson_id) || `Lesson ${data.lesson_id}`;
-          
-          // Show notification to all users except the initiator
-          const isInitiator = user?.username === data.user_name;
-          if (!isInitiator) {
-            setNotificationData({
-              lessonName: lessonName
-            });
-            setShowEndNotification(true);
-            
-            // Display toast notification for better visibility
-            toast({
-              title: "Lesson Ended",
-              description: `${data.user_name || 'A lead student'} has ended the lesson "${lessonName}"`,
-              variant: "default",
-            });
-          }
-          
-          // Clear lesson state
-          setActiveLessonId(null);
-          setActiveLesson(null);
-          setLessonStartedBy(null);
+    // The notifications are now handled by the WebSocket context
+    // We only need to handle the lesson state here
+    const handleLessonState = (isActive: boolean, lessonId?: string, userName?: string) => {
+      setIsLessonActive(isActive);
+      if (isActive) {
+        setActiveLessonId(lessonId?.toString());
+        setLessonStartedBy(userName || 'Lead Student');
+        
+        // Show popup for students only
+        if (user.role === 'student') {
+          setShowLessonStartPopup(true);
         }
-      } catch (error) {
-        console.error("Error processing WebSocket message:", error);
+      } else {
+        setActiveLessonId(null);
+        setActiveLesson(null);
+        setLessonStartedBy(null);
       }
     };
-  }, [socket, user]);
+
+    // The actual WebSocket events are handled by the WebSocket context
+    return () => {
+      // Cleanup if needed
+    };
+  }, [isConnected, user]);
 
   // Helper function to find a lesson name by ID
   const findLessonName = (lessonId: string | number): string | null => {
@@ -485,6 +411,18 @@ export default function Layout() {
           lessonId={activeLessonId || ''}
         />
       )}
+      <NotificationDialog 
+        type="start" 
+        data={notificationData} 
+        open={showStartNotification} 
+        onOpenChange={setShowStartNotification} 
+      />
+      <NotificationDialog 
+        type="end" 
+        data={notificationData} 
+        open={showEndNotification} 
+        onOpenChange={setShowEndNotification} 
+      />
       <div className="min-h-screen bg-background">
         <div className="flex">
           {/* Sidebar */}
@@ -832,20 +770,6 @@ export default function Layout() {
             </div>
           </div>
         </div>
-
-        {/* Notification Dialogs */}
-        <NotificationDialog 
-          type="start" 
-          data={notificationData} 
-          open={showStartNotification} 
-          onOpenChange={setShowStartNotification} 
-        />
-        <NotificationDialog 
-          type="end" 
-          data={notificationData} 
-          open={showEndNotification} 
-          onOpenChange={setShowEndNotification} 
-        />
       </div>
     </>
   );
