@@ -1184,7 +1184,9 @@ io.on('connection', (socket) => {
     // Broadcast to ALL connected clients
     io.emit('notification', {
       type: 'lesson_started',
-      message: `Lesson started by ${data.userName}`
+      lessonName: data.lessonName,
+      userName: data.userName,
+      message: `${data.lessonName} - Started by ${data.userName}`
     });
   });
 
@@ -1194,7 +1196,9 @@ io.on('connection', (socket) => {
     // Broadcast to ALL connected clients
     io.emit('notification', {
       type: 'lesson_ended',
-      message: `Lesson ended by ${data.userName}`
+      lessonName: data.lessonName,
+      userName: data.userName,
+      message: `${data.lessonName} - Ended by ${data.userName}`
     });
   });
 
