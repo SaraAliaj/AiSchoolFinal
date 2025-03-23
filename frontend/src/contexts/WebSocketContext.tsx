@@ -89,19 +89,34 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
         // Handle initial online users list
         newSocket.on('online_users', (users: User[]) => {
             console.log('Received initial online users list:', users);
-            setOnlineUsers(users.filter(user => user.active));
+            const activeUsers = users.filter(user => user.active);
+            console.log('Filtered active users:', activeUsers);
+            setOnlineUsers(activeUsers);
         });
 
         // Handle user status changes
         newSocket.on('user_status_change', (userInfo: User) => {
-            console.log('User status changed:', userInfo);
+            console.log('User status change received:', userInfo);
+            
             setOnlineUsers(prev => {
-                // Create a new array with unique users based on userId
-                const updatedUsers = userInfo.active
-                    ? [...prev.filter(u => u.userId !== userInfo.userId), userInfo]
-                    : prev.filter(u => u.userId !== userInfo.userId);
+                let updatedUsers;
+                if (userInfo.active) {
+                    // Add or update user
+                    updatedUsers = [
+                        ...prev.filter(u => u.userId !== userInfo.userId),
+                        userInfo
+                    ].sort((a, b) => {
+                        // Sort by role (lead_student first) then by username
+                        if (a.role === 'lead_student' && b.role !== 'lead_student') return -1;
+                        if (a.role !== 'lead_student' && b.role === 'lead_student') return 1;
+                        return a.username.localeCompare(b.username);
+                    });
+                } else {
+                    // Remove user
+                    updatedUsers = prev.filter(u => u.userId !== userInfo.userId);
+                }
                 
-                console.log('Updated online users:', updatedUsers);
+                console.log('Updated online users list:', updatedUsers);
                 return updatedUsers;
             });
         });
@@ -111,11 +126,23 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
             setIsConnected(false);
         });
 
+        // Handle reconnection
+        newSocket.on('reconnect', () => {
+            console.log('Reconnected to Socket.IO server');
+            if (userId) {
+                console.log('Re-authenticating after reconnection');
+                newSocket.emit('authenticate', userId);
+            }
+        });
+
         setSocket(newSocket);
 
+        // Cleanup function
         return () => {
             console.log('Cleaning up WebSocket connection');
-            newSocket.disconnect();
+            if (socket?.connected) {
+                socket.disconnect();
+            }
         };
     }, [userId]);
 
