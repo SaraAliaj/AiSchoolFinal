@@ -361,30 +361,24 @@ export default function Layout() {
   useEffect(() => {
     if (!isConnected || !user) return;
 
-    // The notifications are now handled by the WebSocket context
-    // We only need to handle the lesson state here
-    const handleLessonState = (isActive: boolean, lessonId?: string, userName?: string) => {
-      setIsLessonActive(isActive);
-      if (isActive) {
-        setActiveLessonId(lessonId?.toString());
-        setLessonStartedBy(userName || 'Lead Student');
-        
-        // Show popup for students only
-        if (user.role === 'student') {
-          setShowLessonStartPopup(true);
-        }
-      } else {
-        setActiveLessonId(null);
-        setActiveLesson(null);
-        setLessonStartedBy(null);
-      }
-    };
+    // Update lesson state based on notifications
+    if (showStartNotification && activeLesson?.name && notificationData.lessonName.startsWith(activeLesson.name)) {
+      setIsLessonActive(true);
+    }
 
-    // The actual WebSocket events are handled by the WebSocket context
-    return () => {
-      // Cleanup if needed
-    };
-  }, [isConnected, user]);
+    if (showEndNotification && activeLesson?.name && notificationData.lessonName.startsWith(activeLesson.name)) {
+      setIsLessonActive(false);
+    }
+
+  }, [isConnected, user, showStartNotification, showEndNotification, activeLesson, notificationData]);
+
+  // Add new useEffect to handle initial lesson state
+  useEffect(() => {
+    // Reset lesson state when navigating away from lessons
+    if (!location.pathname.includes('/lessons')) {
+      setIsLessonActive(false);
+    }
+  }, [location.pathname]);
 
   // Helper function to find a lesson name by ID
   const findLessonName = (lessonId: string | number): string | null => {
@@ -746,15 +740,15 @@ export default function Layout() {
                           Download PDF
                         </Button>
                         
-                      {isLessonActive ? (
-                          <div className="text-green-700 font-medium flex items-center bg-green-50 px-3 py-1.5 rounded border border-green-200">
+                      {isLessonActive && notificationData.lessonName.startsWith(activeLesson?.name || '') ? (
+                          <div className="text-green-600 font-medium flex items-center bg-green-50 px-3 py-1.5 rounded border border-green-200">
                             <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
-                            Lesson In Progress
+                            Lesson Started
                           </div>
                         ) : (
-                          <div className="text-amber-700 font-medium flex items-center bg-amber-50 px-3 py-1.5 rounded border border-amber-200">
-                            <Clock className="h-4 w-4 mr-2 text-amber-600" />
-                              Waiting for Lesson to Begin
+                          <div className="text-yellow-600 font-medium flex items-center bg-yellow-50 px-3 py-1.5 rounded border border-yellow-200">
+                            <Clock className="h-4 w-4 mr-2 text-yellow-600" />
+                            Waiting for Lesson to Begin
                           </div>
                       )}
                     </div>

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
-import { Socket, io as socketIO } from 'socket.io-client';
+import { Manager } from 'socket.io-client';
 
 interface WebSocketContextType {
     startLesson: (lessonId: string, userName: string, lessonName: string) => void;
@@ -28,7 +28,7 @@ interface WebSocketProviderProps {
 }
 
 export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
-    const [socket, setSocket] = useState<Socket | null>(null);
+    const [socket, setSocket] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const [showStartNotification, setShowStartNotification] = useState(false);
     const [showEndNotification, setShowEndNotification] = useState(false);
@@ -43,7 +43,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             : 'http://localhost:3000';
 
         console.log('Connecting to Socket.IO server:', socketUrl);
-        const newSocket = socketIO(socketUrl);
+        const manager = new Manager(socketUrl);
+        const newSocket = manager.socket('/');
 
         // Handle connection events
         newSocket.on('connect', () => {
@@ -60,9 +61,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             setNotificationData({
                 lessonName: `${lessonName} - ${data.type === 'lesson_started' ? 'Started' : 'Ended'} by ${userName}`
             });
+
+            // Set the appropriate notification flag without clearing the other
             if (data.type === 'lesson_started') {
                 setShowStartNotification(true);
-            } else {
+            } else if (data.type === 'lesson_ended') {
                 setShowEndNotification(true);
             }
         });
@@ -96,9 +99,9 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     };
 
     return (
-        <WebSocketContext.Provider value={{
-            startLesson,
-            endLesson,
+        <WebSocketContext.Provider value={{ 
+            startLesson, 
+            endLesson, 
             isConnected,
             showStartNotification,
             showEndNotification,

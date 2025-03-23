@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card';
 import { Loader2 } from 'lucide-react';
 import { api } from '@/server/api';
 import LessonChatbot from '@/components/LessonChatbot';
+import { useWebSocket } from '@/contexts/WebSocketContext';
 
 interface LessonData {
   id: string;
@@ -17,6 +18,12 @@ export default function LessonPage() {
   const [lessonData, setLessonData] = useState<LessonData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLessonActive, setIsLessonActive] = useState(false);
+  const { 
+    showStartNotification, 
+    showEndNotification, 
+    notificationData 
+  } = useWebSocket();
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -53,6 +60,24 @@ export default function LessonPage() {
 
     fetchLessonData();
   }, [lessonId, navigate]);
+
+  // Effect to handle lesson status updates
+  useEffect(() => {
+    if (showStartNotification && 
+        notificationData.lessonName && 
+        notificationData.lessonName.startsWith(lessonData?.title || '')) {
+      setIsLessonActive(true);
+    }
+  }, [showStartNotification, notificationData, lessonData]);
+
+  // Effect to handle lesson end
+  useEffect(() => {
+    if (showEndNotification && 
+        notificationData.lessonName && 
+        notificationData.lessonName.startsWith(lessonData?.title || '')) {
+      setIsLessonActive(false);
+    }
+  }, [showEndNotification, notificationData, lessonData]);
 
   if (isLoading) {
     return (
