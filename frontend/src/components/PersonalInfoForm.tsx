@@ -90,84 +90,54 @@ export default function PersonalInfoForm() {
     }
   });
 
-  // Load user's existing data when component mounts
+  // Load data from localStorage when component mounts
   useEffect(() => {
-    const loadUserData = async () => {
-      if (!user?.id) {
-        setIsLoading(false);
-        return;
-      }
-
+    const loadLocalData = () => {
       try {
-        setIsLoading(true);
-        const response = await api.getPersonalInfo();
-        
-        if (response) {
-          // Update form data with existing user data for each section
-          setFormData(prevData => ({
-            ...prevData,
-            profile: {
-              ...prevData.profile,
-              ...response.profile
-            },
-            technical: {
-              ...prevData.technical,
-              ...response.technical
-            },
-            programming: {
-              ...prevData.programming,
-              ...response.programming
-            },
-            database: {
-              ...prevData.database,
-              ...response.database
-            },
-            ai: {
-              ...prevData.ai,
-              ...response.ai
-            },
-            collaboration: {
-              ...prevData.collaboration,
-              ...response.collaboration
-            }
-          }));
+        const savedData = localStorage.getItem('personalInfo');
+        if (savedData) {
+          setFormData(JSON.parse(savedData));
         }
       } catch (error) {
-        console.error('Error loading user data:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load your information. Please try again later.",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
+        console.error('Error loading local data:', error);
       }
+      setIsLoading(false);
     };
 
-    loadUserData();
-  }, [user?.id]);
+    loadLocalData();
+  }, []);
 
   const handleInputChange = (section: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value
-      }
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [field]: value
+        }
+      };
+      // Save to localStorage whenever data changes
+      localStorage.setItem('personalInfo', JSON.stringify(newData));
+      return newData;
+    });
   };
 
   const handleNestedInputChange = (section: string, parent: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [parent]: {
-          ...prev[section][parent],
-          [field]: value
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [section]: {
+          ...prev[section],
+          [parent]: {
+            ...prev[section][parent],
+            [field]: value
+          }
         }
-      }
-    }));
+      };
+      // Save to localStorage whenever data changes
+      localStorage.setItem('personalInfo', JSON.stringify(newData));
+      return newData;
+    });
   };
 
   const handleSaveSection = async (sectionId: string) => {
@@ -177,7 +147,9 @@ export default function PersonalInfoForm() {
       // Show save animation
       setShowSaveAnimation({ section: sectionId, show: true });
       
+      // Save to both API and localStorage
       await api.savePersonalInfo(sectionId, sectionData);
+      localStorage.setItem('personalInfo', JSON.stringify(formData));
 
       toast({
         title: "Success",
@@ -194,7 +166,7 @@ export default function PersonalInfoForm() {
       console.error('Error saving section data:', error);
       toast({
         title: "Error",
-        description: "Failed to save data. Please try again.",
+        description: "Failed to save data to server, but your changes are saved locally.",
         variant: "destructive"
       });
       setShowSaveAnimation({ section: '', show: false });

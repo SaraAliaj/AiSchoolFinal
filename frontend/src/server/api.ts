@@ -448,16 +448,6 @@ const api = {
     }
   },
 
-  getPersonalInfo: async () => {
-    try {
-      const response = await axiosInstance.get('/personal-info');
-      return response.data;
-    } catch (error) {
-      console.error('Failed to fetch personal info:', error);
-      throw error;
-    }
-  },
-
   getLeadStudent: async () => {
     try {
       const response = await axiosInstance.get('/lead-student');
