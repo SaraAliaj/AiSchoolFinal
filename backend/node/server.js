@@ -1066,6 +1066,7 @@ app.get('/api/lessons/:id/download', async (req, res) => {
 
 // Socket.io connection handler
 const userSockets = new Map(); // Map to track user's socket connections
+const onlineUsers = new Map(); // Map to track online users' info
 
 io.on('connection', (socket) => {
   console.log('A user connected:', socket.id);
@@ -1097,49 +1098,64 @@ io.on('connection', (socket) => {
       );
       
       if (userRows.length > 0) {
-        console.log('User authenticated:', {
-          userId,
-          username: userRows[0].username,
-          role: userRows[0].role,
-          socketId: socket.id
-        });
-        
-        io.emit('user_status_change', {
+        const userInfo = {
           userId,
           username: userRows[0].username,
           surname: userRows[0].surname,
           role: userRows[0].role,
           active: true
+        };
+        
+        // Store user info in onlineUsers map
+        onlineUsers.set(userId, userInfo);
+        
+        console.log('User authenticated:', {
+          ...userInfo,
+          socketId: socket.id
         });
+        
+        // Broadcast user status change to all clients
+        io.emit('user_status_change', userInfo);
+        
+        // Send current online users list to the newly connected user
+        socket.emit('online_users', Array.from(onlineUsers.values()));
       }
     } catch (error) {
       console.error('Error updating user status on connect:', error);
     }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', async () => {
+    if (!socket.userId) return;
     
-    // Set up an interval to update last_activity more frequently
-    const activityInterval = setInterval(async () => {
-      try {
-        const [userExists] = await promisePool.query(
-          'SELECT id FROM users WHERE id = ? AND active = TRUE',
-          [userId]
-        );
+    const userId = socket.userId;
+    const userSockets = userSockets.get(userId);
+    
+    if (userSockets) {
+      userSockets.delete(socket.id);
+      
+      // If this was the user's last socket connection, mark them as offline
+      if (userSockets.size === 0) {
+        userSockets.delete(userId);
+        onlineUsers.delete(userId);
         
-        if (userExists.length > 0) {
+        try {
           await promisePool.query(
-            'UPDATE users SET last_activity = NOW() WHERE id = ?',
+            'UPDATE users SET active = FALSE, last_activity = NOW() WHERE id = ?',
             [userId]
           );
-          console.log(`Updated last_activity for user ${userId}`);
-        } else {
-          clearInterval(activityInterval);
+          
+          // Broadcast user offline status
+          io.emit('user_status_change', {
+            userId,
+            active: false
+          });
+        } catch (error) {
+          console.error('Error updating user status on disconnect:', error);
         }
-      } catch (error) {
-        console.error('Error updating last_activity:', error);
       }
-    }, 15000); // Update every 15 seconds
-    
-    // Store the interval ID in the socket for cleanup
-    socket.activityInterval = activityInterval;
+    }
   });
 
   // Handle group chat messages
@@ -1200,10 +1216,6 @@ io.on('connection', (socket) => {
       userName: data.userName,
       message: `${data.lessonName} - Ended by ${data.userName}`
     });
-  });
-
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
   });
 });
 
