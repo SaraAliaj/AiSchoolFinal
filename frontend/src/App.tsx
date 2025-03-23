@@ -40,8 +40,8 @@ const WebSocketEnabledRoute = ({ children }) => {
   
   return (
     <WebSocketProvider 
-      userId={user.id.toString()} 
-      username={user.username} 
+      userId={user.id.toString()}
+      username={user.username}
       role={user.role}
     >
       {children}

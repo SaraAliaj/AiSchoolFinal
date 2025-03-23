@@ -2,6 +2,14 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Manager } from 'socket.io-client';
 
+interface User {
+    userId: string;
+    username: string;
+    surname: string;
+    role: string;
+    active: boolean;
+}
+
 interface WebSocketContextType {
     startLesson: (lessonId: string, userName: string, lessonName: string) => void;
     endLesson: (lessonId: string, userName: string, lessonName: string) => void;
@@ -11,6 +19,7 @@ interface WebSocketContextType {
     notificationData: { lessonName: string; duration?: number };
     setShowStartNotification: (show: boolean) => void;
     setShowEndNotification: (show: boolean) => void;
+    onlineUsers: User[];
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -25,9 +34,12 @@ export const useWebSocket = () => {
 
 interface WebSocketProviderProps {
     children: React.ReactNode;
+    userId?: string;
+    username?: string;
+    role?: string;
 }
 
-export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, userId, username, role }) => {
     const [socket, setSocket] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const [showStartNotification, setShowStartNotification] = useState(false);
@@ -35,6 +47,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
     const [notificationData, setNotificationData] = useState<{ lessonName: string; duration?: number }>({
         lessonName: ''
     });
+    const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
 
     useEffect(() => {
         // Connect to the Socket.IO server
@@ -50,6 +63,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         newSocket.on('connect', () => {
             console.log('Connected to Socket.IO server');
             setIsConnected(true);
+            if (userId) {
+                console.log('Authenticating with userId:', userId);
+                newSocket.emit('authenticate', userId);
+            }
         });
 
         // Handle notifications
@@ -62,12 +79,31 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
                 lessonName: `${lessonName} - ${data.type === 'lesson_started' ? 'Started' : 'Ended'} by ${userName}`
             });
 
-            // Set the appropriate notification flag without clearing the other
             if (data.type === 'lesson_started') {
                 setShowStartNotification(true);
             } else if (data.type === 'lesson_ended') {
                 setShowEndNotification(true);
             }
+        });
+
+        // Handle initial online users list
+        newSocket.on('online_users', (users: User[]) => {
+            console.log('Received initial online users list:', users);
+            setOnlineUsers(users.filter(user => user.active));
+        });
+
+        // Handle user status changes
+        newSocket.on('user_status_change', (userInfo: User) => {
+            console.log('User status changed:', userInfo);
+            setOnlineUsers(prev => {
+                // Create a new array with unique users based on userId
+                const updatedUsers = userInfo.active
+                    ? [...prev.filter(u => u.userId !== userInfo.userId), userInfo]
+                    : prev.filter(u => u.userId !== userInfo.userId);
+                
+                console.log('Updated online users:', updatedUsers);
+                return updatedUsers;
+            });
         });
 
         newSocket.on('disconnect', () => {
@@ -78,9 +114,10 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
         setSocket(newSocket);
 
         return () => {
+            console.log('Cleaning up WebSocket connection');
             newSocket.disconnect();
         };
-    }, []);
+    }, [userId]);
 
     const startLesson = (lessonId: string, userName: string, lessonName: string) => {
         if (socket?.connected) {
@@ -107,7 +144,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }
             showEndNotification,
             notificationData,
             setShowStartNotification,
-            setShowEndNotification
+            setShowEndNotification,
+            onlineUsers
         }}>
             {children}
         </WebSocketContext.Provider>
