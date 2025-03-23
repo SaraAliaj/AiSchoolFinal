@@ -1178,71 +1178,28 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Restore lesson-related events
+  // Handle lesson start
   socket.on('startLesson', (data) => {
-    const { lessonId, lessonName, duration, teacherName } = data;
-    io.emit('lessonStarted', {
-      lessonId,
-      lessonName,
-      duration,
-      teacherName
-    });
     console.log('Lesson started:', data);
+    // Broadcast to ALL connected clients
+    io.emit('notification', {
+      type: 'lesson_started',
+      message: `Lesson started by ${data.userName}`
+    });
   });
 
+  // Handle lesson end
   socket.on('endLesson', (data) => {
-    socket.broadcast.emit('lessonEnded', data);
     console.log('Lesson ended:', data);
+    // Broadcast to ALL connected clients
+    io.emit('notification', {
+      type: 'lesson_ended',
+      message: `Lesson ended by ${data.userName}`
+    });
   });
-  
-  // Handle disconnection
-  socket.on('disconnect', async () => {
-    console.log('A user disconnected:', socket.id);
-    
-    // Clear the activity update interval
-    if (socket.activityInterval) {
-      clearInterval(socket.activityInterval);
-    }
-    
-    // If the socket was authenticated, update the user's active status
-    if (socket.userId) {
-      // Remove this socket from the user's connections
-      if (userSockets.has(socket.userId)) {
-        userSockets.get(socket.userId).delete(socket.id);
-        
-        // Only update active status if this was the user's last connection
-        if (userSockets.get(socket.userId).size === 0) {
-          try {
-            // Update user's active status to false
-            await promisePool.query(
-              'UPDATE users SET active = FALSE WHERE id = ?',
-              [socket.userId]
-            );
-            
-            // Get user info for the socket event
-            const [userRows] = await promisePool.query(
-              'SELECT username, surname, role FROM users WHERE id = ?',
-              [socket.userId]
-            );
-            
-            if (userRows.length > 0) {
-              io.emit('user_status_change', {
-                userId: socket.userId,
-                username: userRows[0].username,
-                surname: userRows[0].surname,
-                role: userRows[0].role,
-                active: false
-              });
-            }
-            
-            // Clean up the user's entry in userSockets
-            userSockets.delete(socket.userId);
-          } catch (error) {
-            console.error('Error updating user status on disconnect:', error);
-          }
-        }
-      }
-    }
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
   });
 });
 
