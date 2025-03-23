@@ -1073,88 +1073,115 @@ io.on('connection', (socket) => {
   
   // Store the user ID when they authenticate
   socket.on('authenticate', async (userId) => {
-    if (!userId) return;
+    if (!userId) {
+      console.log('Authentication failed: No userId provided');
+      return;
+    }
     
     socket.userId = userId;
     console.log(`Socket ${socket.id} authenticated as user ${userId}`);
     
-    // Add this socket to the user's connections
-    if (!userSockets.has(userId)) {
-      userSockets.set(userId, new Set());
-    }
-    userSockets.get(userId).add(socket.id);
-    
-    // Update user's active status and last activity
     try {
+      // Add this socket to the user's connections
+      if (!userSockets.has(userId)) {
+        userSockets.set(userId, new Set());
+      }
+      userSockets.get(userId).add(socket.id);
+      
+      // Get user info from database
+      const [userRows] = await promisePool.query(
+        'SELECT username, surname, role, active FROM users WHERE id = ?',
+        [userId]
+      );
+      
+      if (userRows.length === 0) {
+        console.log(`User ${userId} not found in database`);
+        return;
+      }
+      
+      const userInfo = {
+        userId,
+        username: userRows[0].username,
+        surname: userRows[0].surname,
+        role: userRows[0].role,
+        active: true
+      };
+      
+      // Update user's active status in database
       await promisePool.query(
         'UPDATE users SET active = TRUE, last_activity = NOW() WHERE id = ?',
         [userId]
       );
       
-      // Get user info for the socket event
-      const [userRows] = await promisePool.query(
-        'SELECT username, surname, role FROM users WHERE id = ?',
-        [userId]
-      );
+      // Store user info in onlineUsers map
+      onlineUsers.set(userId, userInfo);
       
-      if (userRows.length > 0) {
-        const userInfo = {
-          userId,
-          username: userRows[0].username,
-          surname: userRows[0].surname,
-          role: userRows[0].role,
-          active: true
-        };
-        
-        // Store user info in onlineUsers map
-        onlineUsers.set(userId, userInfo);
-        
-        console.log('User authenticated:', {
-          ...userInfo,
-          socketId: socket.id
-        });
-        
-        // Broadcast user status change to all clients
-        io.emit('user_status_change', userInfo);
-        
-        // Send current online users list to the newly connected user
-        socket.emit('online_users', Array.from(onlineUsers.values()));
-      }
+      console.log('User authenticated and status updated:', {
+        ...userInfo,
+        socketId: socket.id,
+        totalSockets: userSockets.get(userId).size
+      });
+      
+      // Get all currently online users
+      const currentOnlineUsers = Array.from(onlineUsers.values());
+      
+      // Send current online users list to the newly connected user
+      socket.emit('online_users', currentOnlineUsers);
+      
+      // Broadcast user's online status to all other clients
+      socket.broadcast.emit('user_status_change', userInfo);
+      
     } catch (error) {
-      console.error('Error updating user status on connect:', error);
+      console.error('Error in socket authentication:', error);
     }
   });
 
   // Handle disconnection
   socket.on('disconnect', async () => {
-    if (!socket.userId) return;
-    
     const userId = socket.userId;
-    const userSockets = userSockets.get(userId);
+    if (!userId) return;
     
-    if (userSockets) {
-      userSockets.delete(socket.id);
-      
-      // If this was the user's last socket connection, mark them as offline
-      if (userSockets.size === 0) {
-        userSockets.delete(userId);
-        onlineUsers.delete(userId);
+    console.log(`Socket ${socket.id} disconnected for user ${userId}`);
+    
+    try {
+      const userSocketSet = userSockets.get(userId);
+      if (userSocketSet) {
+        userSocketSet.delete(socket.id);
+        console.log(`Remaining sockets for user ${userId}:`, userSocketSet.size);
         
-        try {
+        // If this was the user's last socket connection, mark them as offline
+        if (userSocketSet.size === 0) {
+          userSockets.delete(userId);
+          onlineUsers.delete(userId);
+          
+          // Update database
           await promisePool.query(
             'UPDATE users SET active = FALSE, last_activity = NOW() WHERE id = ?',
             [userId]
           );
           
-          // Broadcast user offline status
-          io.emit('user_status_change', {
-            userId,
-            active: false
-          });
-        } catch (error) {
-          console.error('Error updating user status on disconnect:', error);
+          // Get user info for the broadcast
+          const [userRows] = await promisePool.query(
+            'SELECT username, surname, role FROM users WHERE id = ?',
+            [userId]
+          );
+          
+          if (userRows.length > 0) {
+            const offlineStatus = {
+              userId,
+              username: userRows[0].username,
+              surname: userRows[0].surname,
+              role: userRows[0].role,
+              active: false
+            };
+            
+            console.log('Broadcasting offline status:', offlineStatus);
+            io.emit('user_status_change', offlineStatus);
+          }
         }
       }
+    } catch (error) {
+      console.error('Error handling socket disconnect:', error);
     }
   });
 
@@ -1219,8 +1246,10 @@ io.on('connection', (socket) => {
   });
 });
 
-// Add a cleanup interval to handle stale connections
+// Add a more frequent cleanup interval for stale connections
 setInterval(async () => {
+  console.log('Running connection cleanup...');
+  
   for (const [userId, sockets] of userSockets.entries()) {
     // Check if any sockets are still connected
     const connectedSockets = Array.from(sockets).filter(socketId => {
@@ -1228,12 +1257,16 @@ setInterval(async () => {
       return socket && socket.connected;
     });
     
+    console.log(`User ${userId} has ${connectedSockets.length} active connections`);
+    
     // If no sockets are connected, mark user as offline
     if (connectedSockets.length === 0) {
       try {
+        console.log(`Marking user ${userId} as offline due to no active connections`);
+        
         // Update user's active status to false
         await promisePool.query(
-          'UPDATE users SET active = FALSE WHERE id = ?',
+          'UPDATE users SET active = FALSE, last_activity = NOW() WHERE id = ?',
           [userId]
         );
         
@@ -1244,23 +1277,27 @@ setInterval(async () => {
         );
         
         if (userRows.length > 0) {
-          io.emit('user_status_change', {
+          const offlineStatus = {
             userId,
             username: userRows[0].username,
             surname: userRows[0].surname,
             role: userRows[0].role,
             active: false
-          });
+          };
+          
+          console.log('Broadcasting offline status from cleanup:', offlineStatus);
+          io.emit('user_status_change', offlineStatus);
         }
         
-        // Clean up the user's entry in userSockets
+        // Clean up the tracking maps
         userSockets.delete(userId);
+        onlineUsers.delete(userId);
       } catch (error) {
         console.error('Error updating user status during cleanup:', error);
       }
     }
   }
-}, 30000); // Run every 30 seconds
+}, 15000); // Run every 15 seconds instead of 30
 
 // Update the startServer function to use httpServer instead of app
 const startServer = async () => {
