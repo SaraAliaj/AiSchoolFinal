@@ -15,8 +15,8 @@ class PDFIntegration {
     // Database connection pool
     this.pool = mysql.createPool({
       host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || 'password',
+      user: process.env.DB_USER || 'Sara',
+      password: process.env.DB_PASSWORD || 'Sara0330!!',
       database: process.env.DB_NAME || 'aischool',
       waitForConnections: true,
       connectionLimit: 10,

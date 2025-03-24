@@ -10,8 +10,8 @@ dotenv.config();
 // Get database connection details from environment variables or use defaults
 const DB_HOST = process.env.DB_HOST || 'localhost';
 const DB_PORT = process.env.DB_PORT || 3306;
-const DB_USER = process.env.DB_USER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || 'password';
+const DB_USER = process.env.DB_USER || 'Sara';
+const DB_PASSWORD = process.env.DB_PASSWORD || 'Sara0330!!';
 const DB_NAME = process.env.DB_NAME || 'aischool';
 
 async function updateLessonPDF() {
