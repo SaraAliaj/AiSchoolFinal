@@ -11,7 +11,7 @@ import pdfIntegration from './pdf_integration.js';
 import { Server } from 'socket.io';
 import { createServer } from 'http';
 import ensureAdminRoles from './ensure-admin-roles.js';
-import promisePool from './database.js'; // Import our promise pool
+import { createPool } from './database.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -67,111 +67,62 @@ console.log('Database configuration loaded from database.js module');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Utility function to ensure required tables exist
-const ensureTablesExist = async () => {
+// Create a promise pool for database connections
+const promisePool = createPool();
+
+// Test database connection on startup
+const testDatabaseConnection = async () => {
   try {
-    // Check if users table has last_activity column
-    const [userColumns] = await promisePool.query('SHOW COLUMNS FROM users');
-    const hasLastActivity = userColumns.some(col => col.Field === 'last_activity');
-    
-    if (!hasLastActivity) {
-      console.log('Adding last_activity column to users table...');
-      await promisePool.query(`
-        ALTER TABLE users 
-        ADD COLUMN last_activity TIMESTAMP 
-        DEFAULT CURRENT_TIMESTAMP 
-        ON UPDATE CURRENT_TIMESTAMP
-      `);
-      console.log('Added last_activity column to users table');
-    }
-
-    // Check if personal_information table exists
-    const [personalInfoCheck] = await promisePool.query('SHOW TABLES LIKE "personal_information"');
-    if (personalInfoCheck.length === 0) {
-      console.log('Creating personal_information table...');
-      await promisePool.query(`
-        CREATE TABLE personal_information (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          user_id INT NOT NULL,
-          section_name VARCHAR(50) NOT NULL,
-          section_data JSON NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-          UNIQUE KEY unique_user_section (user_id, section_name),
-          FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-      `);
-      console.log('Created personal_information table');
-    }
-
-    // Check if lessons table exists
-    const [lessonsCheck] = await promisePool.query('SHOW TABLES LIKE "lessons"');
-    if (lessonsCheck.length === 0) {
-      console.log('Creating lessons table...');
-      
-      // Create the lessons table
-        await promisePool.query(`
-          CREATE TABLE IF NOT EXISTS lessons (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            course_id INT NOT NULL,
-            week_id INT NOT NULL,
-            day_id INT NOT NULL,
-            lesson_name VARCHAR(255) NOT NULL,
-            file_path VARCHAR(255) NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `);
-        console.log('Lessons table created successfully');
-    } else {
-      // Check lessons table structure
-      const [structure] = await promisePool.query('DESCRIBE lessons');
-      console.log('Lessons table structure:', structure);
-      
-      // Check if required columns exist
-      const columns = structure.map(col => col.Field);
-      const requiredColumns = ['course_id', 'week_id', 'day_id', 'lesson_name', 'file_path'];
-      const missingColumns = requiredColumns.filter(col => !columns.includes(col));
-      
-      if (missingColumns.length > 0) {
-        console.log('Missing columns in lessons table:', missingColumns);
-        
-        // Add missing columns
-        for (const column of missingColumns) {
-          let columnType = '';
-          if (['course_id', 'week_id', 'day_id'].includes(column)) {
-            columnType = 'INT NOT NULL';
-          } else {
-            columnType = 'VARCHAR(255) NOT NULL';
-          }
-          
-          await promisePool.query(`ALTER TABLE lessons ADD COLUMN ${column} ${columnType}`);
-          console.log(`Added column ${column} to lessons table`);
-        }
-      }
-    }
-    
+    const connection = await promisePool.getConnection();
+    console.log('Successfully connected to MySQL database');
+    connection.release();
     return true;
   } catch (error) {
-    console.error('Failed to ensure tables exist:', error);
-    throw error;
+    console.error('Failed to connect to MySQL database:', error);
+    return false;
   }
 };
 
-// Improved database connection handling
-const connectToDatabase = async () => {
+// Ensure database tables exist
+const ensureTablesExist = async () => {
   try {
-    // Test the connection with a simple query
-    const [results] = await promisePool.query('SELECT 1 + 1 AS result');
-    console.log('Successfully connected to MySQL using database.js module');
-    console.log('Database test query successful:', results);
+    const connection = await promisePool.getConnection();
     
-    // Ensure required tables exist
-    await ensureTablesExist();
+    // Create users table if it doesn't exist
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) NOT NULL,
+        surname VARCHAR(255),
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password VARCHAR(255) NOT NULL,
+        role ENUM('student', 'lead_student', 'admin') DEFAULT 'student',
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
     
+    // Create personal_information table if it doesn't exist
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS personal_information (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        section_name VARCHAR(50) NOT NULL,
+        section_data JSON NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY unique_user_section (user_id, section_name),
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      )
+    `);
+    
+    connection.release();
+    console.log('Database tables verified/created successfully');
     return true;
   } catch (error) {
-    console.error('Failed to connect to MySQL:', error);
-    throw error;
+    console.error('Error ensuring tables exist:', error);
+    return false;
   }
 };
 
@@ -242,131 +193,93 @@ app.get('/api/db-check', async (req, res) => {
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
+  console.log('Received login request for email:', email);
+
+  // Validate input
+  if (!email || !password) {
+    console.log('Missing required fields:', {
+      email: !email,
+      password: !password
+    });
+    return res.status(400).json({ 
+      message: 'Please provide both email and password',
+      missing: {
+        email: !email,
+        password: !password
+      }
+    });
+  }
+
   try {
-    console.log('Login attempt for:', email);
-    
     // Test database connection first
+    const connection = await promisePool.getConnection();
+    console.log('Database connection established');
+    
     try {
-      await promisePool.query('SELECT 1');
-      console.log('Database connection verified');
-    } catch (dbError) {
-      console.error('Database connection failed:', dbError);
-      return res.status(500).json({ 
-        message: 'Database connection error',
-        error: dbError.message 
-      });
-    }
-
-    const [rows] = await promisePool.query(
-      'SELECT * FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (rows.length === 0) {
-      console.log('No user found for email:', email);
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    const user = rows[0];
-    console.log('Found user:', { 
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      role: user.role,
-      active: user.active
-    });
-
-    const validPassword = await bcrypt.compare(password, user.password);
-
-    if (!validPassword) {
-      console.log('Invalid password for user:', email);
-      return res.status(401).json({ message: 'Invalid credentials' });
-    }
-
-    // Update user's active status to true
-    try {
-      console.log('Updating active status for user:', user.id);
-      await promisePool.query(
-        'UPDATE users SET active = TRUE, last_activity = CURRENT_TIMESTAMP WHERE id = ?',
-        [user.id]
+      // Get user by email
+      const [users] = await connection.query(
+        'SELECT * FROM users WHERE email = ?',
+        [email]
       );
-      console.log('Successfully updated user active status');
-    } catch (updateError) {
-      console.error('Failed to update user active status:', updateError);
-      // Continue with login even if update fails
-    }
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    // Handle both old and new table structures
-    const username = user.username || (user.name ? user.name.split(' ')[0] : 'User');
-    const surname = user.surname || (user.name ? user.name.split(' ').slice(1).join(' ') : '');
-
-    // Default role to 'student' if not set or invalid
-    const validRole = user.role && ['student', 'lead_student', 'admin'].includes(user.role.toLowerCase())
-      ? user.role.toLowerCase()
-      : 'student';
-
-    // Update user's role in database if it's not set
-    if (!user.role) {
-      try {
-        console.log('Setting default role for user:', user.id);
-        await promisePool.query(
-          'UPDATE users SET role = ? WHERE id = ?',
-          [validRole, user.id]
-        );
-        console.log('Successfully updated user role');
-      } catch (roleError) {
-        console.error('Failed to update user role:', roleError);
-        // Continue with login even if role update fails
+      if (users.length === 0) {
+        console.log('No user found with email:', email);
+        return res.status(401).json({ message: 'Invalid email or password' });
       }
-    }
 
-    console.log('User logged in successfully:', {
-      id: user.id,
-      username,
-      email: user.email,
-      role: validRole
-    });
+      const user = users[0];
+      console.log('User found:', { id: user.id, email: user.email, role: user.role });
 
-    // Emit socket event for online status update
-    try {
-      io.emit('user_status_change', { 
-        userId: user.id, 
-        username,
-        surname,
-        active: true 
+      // Check if user is active
+      if (!user.active) {
+        console.log('Inactive user attempted login:', email);
+        return res.status(401).json({ message: 'Account is deactivated' });
+      }
+
+      // Verify password
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        console.log('Invalid password for user:', email);
+        return res.status(401).json({ message: 'Invalid email or password' });
+      }
+
+      console.log('Password verified successfully for user:', email);
+
+      // Generate token
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      console.log('Login successful for user:', email);
+
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          username: user.username,
+          surname: user.surname,
+          email: user.email,
+          role: user.role,
+          active: user.active
+        }
       });
-      console.log('Emitted user status change event');
-    } catch (socketError) {
-      console.error('Failed to emit socket event:', socketError);
-      // Continue with login even if socket event fails
+    } catch (error) {
+      console.error('Database error during login:', error);
+      res.status(500).json({ 
+        message: 'Server error during login',
+        error: error.message,
+        sqlMessage: error.sqlMessage
+      });
+    } finally {
+      connection.release();
     }
-
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        username,
-        email: user.email,
-        surname,
-        role: validRole,
-        active: true
-      }
-    });
   } catch (error) {
-    console.error('Login error:', {
-      message: error.message,
-      code: error.code,
-      sqlMessage: error.sqlMessage
-    });
+    console.error('Login error:', error);
     res.status(500).json({ 
       message: 'Server error during login',
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -400,59 +313,71 @@ app.post('/api/auth/register', async (req, res) => {
   }
 
   try {
-    // Check database connection
-    await promisePool.query('SELECT 1');
+    // Test database connection first
+    const connection = await promisePool.getConnection();
+    console.log('Database connection established');
     
-    // Log the registration attempt
-    console.log('Registration attempt for:', { username, email });
+    try {
+      // Check if email already exists
+      const [existing] = await connection.query(
+        'SELECT id FROM users WHERE email = ?',
+        [email]
+      );
 
-    // Check if email already exists
-    const [existing] = await promisePool.query(
-      'SELECT id FROM users WHERE email = ?',
-      [email]
-    );
-
-    if (existing.length > 0) {
-      console.log('Email already exists:', email);
-      return res.status(400).json({ message: 'Email already registered' });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-    console.log('Password hashed successfully');
-
-    // Determine role based on username and surname
-    const role = (username.toLowerCase() === 'admin' && surname.toLowerCase() === 'admin') ? 'admin' : 'student';
-    console.log(`Assigning role: ${role} for user: ${username} ${surname}`);
-
-    // Insert new user with determined role
-    const [result] = await promisePool.query(
-      'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-      [username, surname, email, hashedPassword, role, true]
-    );
-
-    console.log('User registered successfully:', { id: result.insertId, role });
-
-    const token = jwt.sign(
-      { userId: result.insertId, email },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
-    res.status(201).json({
-      token,
-      user: {
-        id: result.insertId,
-        username,
-        surname,
-        email,
-        role,
-        active: true
+      if (existing.length > 0) {
+        console.log('Email already exists:', email);
+        return res.status(400).json({ message: 'Email already registered' });
       }
-    });
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+      console.log('Password hashed successfully');
+
+      // Determine role based on username and surname
+      const role = (username.toLowerCase() === 'admin' && surname.toLowerCase() === 'admin') ? 'admin' : 'student';
+      console.log(`Assigning role: ${role} for user: ${username} ${surname}`);
+
+      // Insert new user with determined role
+      const [result] = await connection.query(
+        'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
+        [username, surname, email, hashedPassword, role, true]
+      );
+
+      console.log('User registered successfully:', { id: result.insertId, role });
+
+      const token = jwt.sign(
+        { userId: result.insertId, email },
+        JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+
+      res.status(201).json({
+        token,
+        user: {
+          id: result.insertId,
+          username,
+          surname,
+          email,
+          role,
+          active: true
+        }
+      });
+    } catch (error) {
+      console.error('Database error during registration:', error);
+      res.status(500).json({ 
+        message: 'Server error during registration',
+        error: error.message,
+        sqlMessage: error.sqlMessage
+      });
+    } finally {
+      connection.release();
+    }
   } catch (error) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Server error during registration' });
+    res.status(500).json({ 
+      message: 'Server error during registration',
+      error: error.message
+    });
   }
 });
 
@@ -1352,26 +1277,26 @@ setInterval(async () => {
   }
 }, 15000); // Run every 15 seconds instead of 30
 
-// Update the startServer function to use httpServer instead of app
+// Update the startServer function
 const startServer = async () => {
   try {
-    // Connect to the database
-    await connectToDatabase();
-    
-    // Ensure admin roles are set correctly
-    await ensureAdminRoles();
+    // Test database connection
+    const dbConnected = await testDatabaseConnection();
+    if (!dbConnected) {
+      throw new Error('Failed to connect to database');
+    }
     
     // Ensure tables exist
-    await ensureTablesExist();
-    
-    // Clean up online status on server start
-    await cleanupOnlineStatus();
+    const tablesCreated = await ensureTablesExist();
+    if (!tablesCreated) {
+      throw new Error('Failed to create/verify database tables');
+    }
     
     // Get PORT from environment variable
     const PORT = process.env.PORT || 3000;
     console.log(`Starting server with PORT=${PORT}`);
     
-    // Start the HTTP server - binding to 0.0.0.0 is critical for Render deployment
+    // Start the HTTP server
     httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Frontend URL: ${FRONTEND_URL}`);
