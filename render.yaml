@@ -19,14 +19,16 @@ services:
         sync: false
     dockerContext: .
     dockerfilePath: ./Dockerfile.mysql
-    initCommand: mysql -u root -p$MYSQL_ROOT_PASSWORD < /docker-entrypoint-initdb.d/init.sql
+    initCommand: |
+      mysql -u root -p$MYSQL_ROOT_PASSWORD < /docker-entrypoint-initdb.d/init.sql
+      cd /app/backend/node && node init-db.js
 
   # Node.js Backend service
   - type: web
     name: quiz-node-backend
     env: node
     buildCommand: cd backend/node && npm install
-    startCommand: cd backend/node && npm start
+    startCommand: cd backend/node && node init-db.js && npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
