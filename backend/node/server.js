@@ -24,6 +24,7 @@ const io = new Server(httpServer, {
   cors: {
     origin: [
       FRONTEND_URL,
+      'https://aiacademia.tech',
       'http://localhost:5173',
       'http://localhost:5174',
       'http://127.0.0.1:5173',
@@ -40,6 +41,7 @@ const io = new Server(httpServer, {
 app.use(cors({
   origin: [
     FRONTEND_URL,
+    'https://aiacademia.tech',
     'http://localhost:5173',
     'http://localhost:5174'
   ],

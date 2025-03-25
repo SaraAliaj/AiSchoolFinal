@@ -101,8 +101,15 @@ app.get('/api/auth/verify', (req, res) => {
 
 // THEN configure CORS - AFTER the hardcoded endpoints
 app.use(cors({
-  origin: '*',
-  credentials: true
+  origin: [
+    'https://aiacademia.tech',
+    'https://quiz-frontend.onrender.com',
+    'http://localhost:5173',
+    'http://localhost:5174'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Parse JSON bodies
