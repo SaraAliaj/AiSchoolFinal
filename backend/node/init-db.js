@@ -1,5 +1,4 @@
 import 'dotenv/config';
-import fs from 'fs';
 import { createConnection } from './database.js';
 import bcrypt from 'bcrypt';
 import path from 'path';
@@ -17,24 +16,6 @@ const initializeDatabase = async () => {
         // Use our robust connection method from database.js
         connection = await createConnection();    
         console.log('Database connection established');
-        
-        // Execute each statement separately for better error handling
-        try {
-            // Create database if it doesn't exist (may fail if already selected)
-            await connection.query('CREATE DATABASE IF NOT EXISTS aischool');
-            console.log('Database aischool created or already exists');
-        } catch (error) {
-            console.warn('Note: Could not create database (might already be selected):', error.message);
-        }
-        
-        try {
-            // Use the database
-            await connection.query('USE aischool');
-            console.log('Using database aischool');
-        } catch (error) {
-            console.error('Failed to select database:', error.message);
-            throw error; // This is critical, so rethrow
-        }
         
         // Create tables one by one
         console.log('Creating tables...');

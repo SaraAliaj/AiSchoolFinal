@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createConnection } from '../../database.js';
+import { createConnection } from './database.js';
 import bcrypt from 'bcrypt';
 
 async function setupDatabase() {
