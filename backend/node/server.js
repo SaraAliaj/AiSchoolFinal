@@ -337,10 +337,13 @@ app.post('/api/auth/register', async (req, res) => {
       const role = (username.toLowerCase() === 'admin' && surname.toLowerCase() === 'admin') ? 'admin' : 'student';
       console.log(`Assigning role: ${role} for user: ${username} ${surname}`);
 
-      // Insert new user with determined role
+      // Combine username and surname for the name field
+      const fullName = `${username} ${surname || ''}`.trim();
+
+      // Insert new user with determined role and name
       const [result] = await connection.query(
-        'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
-        [username, surname, email, hashedPassword, role, true]
+        'INSERT INTO users (username, surname, name, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [username, surname, fullName, email, hashedPassword, role, true]
       );
 
       console.log('User registered successfully:', { id: result.insertId, role });
@@ -357,6 +360,7 @@ app.post('/api/auth/register', async (req, res) => {
           id: result.insertId,
           username,
           surname,
+          name: fullName,
           email,
           role,
           active: true
