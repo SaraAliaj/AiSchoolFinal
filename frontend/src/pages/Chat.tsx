@@ -91,7 +91,7 @@ export default function Chat() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        const wsUrl = import.meta.env.PROD ? `${config.wsUrl}/grok` : 'ws://localhost:8080/grok';
+        const wsUrl = `${config.wsUrl}/grok`;
         console.log('Connecting to WebSocket at:', wsUrl);
         
         const ws = new WebSocket(wsUrl);

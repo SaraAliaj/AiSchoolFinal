@@ -7,13 +7,13 @@ interface Config {
 const development: Config = {
     nodeApiUrl: 'http://localhost:3000',
     pythonApiUrl: 'http://localhost:8000',
-    wsUrl: 'ws://localhost:8080'
+    wsUrl: 'ws://localhost:8081'
 };
 
 const production: Config = {
-    nodeApiUrl: import.meta.env.VITE_NODE_API_URL || '',
-    pythonApiUrl: import.meta.env.VITE_PYTHON_API_URL || '',
-    wsUrl: `wss://${import.meta.env.VITE_WS_URL}`
+    nodeApiUrl: 'https://quiz-node-backend.onrender.com',
+    pythonApiUrl: 'https://quiz-python-backend.onrender.com',
+    wsUrl: 'wss://quiz-python-backend.onrender.com'
 };
 
 const config: Config = import.meta.env.PROD ? production : development;

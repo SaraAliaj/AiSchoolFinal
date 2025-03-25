@@ -6,11 +6,6 @@ import config from '@/config';
 
 // Get the WebSocket URL based on the current environment
 const getWebSocketUrl = () => {
-  // For local development
-  if (!import.meta.env.PROD) {
-    return 'ws://localhost:8080/grok';
-  }
-  // For production deployment (using config)
   return `${config.wsUrl}/grok`;
 };
 
