@@ -439,12 +439,20 @@ DB_CONFIG = {
 
 def get_db_connection():
     try:
+        # Use Config class for database configuration
+        db_config = {
+            'host': Config.DB_HOST,
+            'user': Config.DB_USER,
+            'password': Config.DB_PASSWORD,
+            'database': Config.DB_NAME
+        }
+        
         print("Attempting to connect to MySQL database with config:", {
-            **DB_CONFIG,
+            **db_config,
             'password': '***'  # Hide password in logs
         })
         
-        connection = mysql.connector.connect(**DB_CONFIG)
+        connection = mysql.connector.connect(**db_config)
         
         if connection.is_connected():
             db_info = connection.get_server_info()
