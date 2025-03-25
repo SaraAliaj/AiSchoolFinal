@@ -2,17 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import { api } from '@/server/api';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import config from '@/config';
 
 // Get the WebSocket URL based on the current environment
 const getWebSocketUrl = () => {
-  const host = window.location.hostname;
-  // Use appropriate ports based on environment
   // For local development
-  if (host === 'localhost' || host === '127.0.0.1') {
-    return `ws://${host}:8081/grok`;
+  if (!import.meta.env.PROD) {
+    return 'ws://localhost:8080/grok';
   }
-  // For production deployment (assuming secure WebSocket)
-  return `wss://${window.location.host}/grok`;
+  // For production deployment (using config)
+  return `${config.wsUrl}/grok`;
 };
 
 const ChatBot = ({ lessonId }) => {

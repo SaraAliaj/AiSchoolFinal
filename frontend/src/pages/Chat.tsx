@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/server/api";
+import config from '@/config';
 
 interface Message {
   id: string;
@@ -90,8 +91,10 @@ export default function Chat() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        // Connect to the general chat endpoint without lesson restrictions
-        const ws = new WebSocket('ws://localhost:8081/grok');
+        const wsUrl = import.meta.env.PROD ? `${config.wsUrl}/grok` : 'ws://localhost:8080/grok';
+        console.log('Connecting to WebSocket at:', wsUrl);
+        
+        const ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
           console.log('Connected to Grok AI WebSocket server');

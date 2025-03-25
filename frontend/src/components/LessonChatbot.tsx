@@ -10,6 +10,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { api } from "@/server/api";
 import { useToast } from "@/components/ui/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import config from '@/config';
 
 interface LessonContent {
   id: string;
@@ -99,7 +100,10 @@ export default function LessonChatbot({
     const tryConnect = () => {
       console.log('Connecting to WebSocket server...');
       
-      const ws = new WebSocket('ws://localhost:8081/grok');
+      const wsUrl = import.meta.env.PROD ? `${config.wsUrl}/grok` : 'ws://localhost:8080/grok';
+      console.log('Using WebSocket URL:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
       
       ws.onopen = () => {
         console.log('Connected to WebSocket server');

@@ -1,14 +1,15 @@
 import axios from 'axios';
+import config from '@/config';
 
 // Determine the backend URL based on the environment
 const getBaseUrl = () => {
-  const port = window.location.port || '80';
-  // If we're running on a dev server (usual ports: 5173, 3000, etc)
-  if (['5173', '5174', '3000', '3001'].includes(port)) {
-    return 'http://localhost:3000/api';
-  } 
-  // In production, assume the API is served from the same domain
-  return '/api';
+  // In production, use the configured API URL
+  if (import.meta.env.PROD) {
+    return `${config.nodeApiUrl}/api`;
+  }
+  
+  // In development, use localhost
+  return 'http://localhost:3000/api';
 };
 
 // Use determined URL
@@ -53,7 +54,7 @@ axiosInstance.interceptors.response.use(
 
 // Get the direct API URL for failover cases
 const getDirectApiUrl = () => {
-  return 'http://localhost:3000/api';
+  return import.meta.env.PROD ? `${config.nodeApiUrl}/api` : 'http://localhost:3000/api';
 };
 
 const api = {
