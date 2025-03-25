@@ -237,30 +237,57 @@ app.post('/api/auth/login', async (req, res) => {
 
   try {
     console.log('Login attempt for:', email);
+    
+    // Test database connection first
+    try {
+      await promisePool.query('SELECT 1');
+      console.log('Database connection verified');
+    } catch (dbError) {
+      console.error('Database connection failed:', dbError);
+      return res.status(500).json({ 
+        message: 'Database connection error',
+        error: dbError.message 
+      });
+    }
+
     const [rows] = await promisePool.query(
       'SELECT * FROM users WHERE email = ?',
       [email]
     );
 
     if (rows.length === 0) {
+      console.log('No user found for email:', email);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     const user = rows[0];
-    console.log('Found user:', { ...user, password: '[REDACTED]' });
+    console.log('Found user:', { 
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      active: user.active
+    });
 
     const validPassword = await bcrypt.compare(password, user.password);
 
     if (!validPassword) {
+      console.log('Invalid password for user:', email);
       return res.status(401).json({ message: 'Invalid credentials' });
     }
 
     // Update user's active status to true
-    console.log('Setting active status to TRUE for user:', user.id);
-    await promisePool.query(
-      'UPDATE users SET active = TRUE WHERE id = ?',
-      [user.id]
-    );
+    try {
+      console.log('Updating active status for user:', user.id);
+      await promisePool.query(
+        'UPDATE users SET active = TRUE, last_activity = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
+      console.log('Successfully updated user active status');
+    } catch (updateError) {
+      console.error('Failed to update user active status:', updateError);
+      // Continue with login even if update fails
+    }
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -279,11 +306,17 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Update user's role in database if it's not set
     if (!user.role) {
-      console.log('Setting default role for user:', user.id);
-      await promisePool.query(
-        'UPDATE users SET role = ? WHERE id = ?',
-        [validRole, user.id]
-      );
+      try {
+        console.log('Setting default role for user:', user.id);
+        await promisePool.query(
+          'UPDATE users SET role = ? WHERE id = ?',
+          [validRole, user.id]
+        );
+        console.log('Successfully updated user role');
+      } catch (roleError) {
+        console.error('Failed to update user role:', roleError);
+        // Continue with login even if role update fails
+      }
     }
 
     console.log('User logged in successfully:', {
@@ -294,12 +327,18 @@ app.post('/api/auth/login', async (req, res) => {
     });
 
     // Emit socket event for online status update
-    io.emit('user_status_change', { 
-      userId: user.id, 
-      username,
-      surname,
-      active: true 
-    });
+    try {
+      io.emit('user_status_change', { 
+        userId: user.id, 
+        username,
+        surname,
+        active: true 
+      });
+      console.log('Emitted user status change event');
+    } catch (socketError) {
+      console.error('Failed to emit socket event:', socketError);
+      // Continue with login even if socket event fails
+    }
 
     res.json({
       token,
@@ -313,8 +352,15 @@ app.post('/api/auth/login', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({ message: 'Server error during login' });
+    console.error('Login error:', {
+      message: error.message,
+      code: error.code,
+      sqlMessage: error.sqlMessage
+    });
+    res.status(500).json({ 
+      message: 'Server error during login',
+      error: error.message 
+    });
   }
 });
 
