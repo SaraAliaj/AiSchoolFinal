@@ -36,8 +36,8 @@ npm install
 ```
 DB_HOST=localhost
 DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=password
+DB_USER=Sara
+DB_PASSWORD=Sara0330!!
 DB_NAME=aischool
 ```
 

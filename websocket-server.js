@@ -13,8 +13,8 @@ const pdf = require('pdf-parse');
 // Database connection configuration
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'password',
+    user: process.env.DB_USER || 'Sara',
+    password: process.env.DB_PASSWORD || 'Sara0330!!',
     database: process.env.DB_NAME || 'aischool',
 };
 

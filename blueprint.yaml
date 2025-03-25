@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: quiz-node-backend
+    runtime: node
+    rootDir: backend/node
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+    autoDeploy: true 
