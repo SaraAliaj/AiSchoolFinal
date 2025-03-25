@@ -40,15 +40,20 @@ const io = new Server(httpServer, {
 // Configure CORS
 app.use(cors({
   origin: [
-    FRONTEND_URL,
     'https://aiacademia.tech',
+    'https://quiz-frontend.onrender.com',
     'http://localhost:5173',
     'http://localhost:5174'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Cache preflight requests for 10 minutes
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 // Parse JSON bodies
 app.use(express.json());
