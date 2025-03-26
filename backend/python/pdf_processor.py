@@ -34,7 +34,7 @@ def get_db_connection():
 
 def get_lesson_pdf_path(lesson_id: str) -> Optional[str]:
     """
-    Get the PDF file path for a lesson from the database
+    Get the PDF file path for a lesson from the database or downloads directory
     """
     connection = get_db_connection()
     if not connection:
@@ -47,22 +47,21 @@ def get_lesson_pdf_path(lesson_id: str) -> Optional[str]:
             cursor.execute(sql, (lesson_id,))
             result = cursor.fetchone()
             
+            # Get the downloads directory path
+            downloads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
+            
             if result and result.get('file_path'):
                 file_path = result.get('file_path')
                 print(f"Found file_path in database for lesson {lesson_id}: {file_path}")
                 
                 # If file_path is just a filename or relative path, convert to full path
                 if not os.path.isabs(file_path):
-                    # Get the base directory (where the Python file is located)
-                    base_dir = os.path.dirname(os.path.abspath(__file__))
-                    
                     # Check if the path already starts with 'downloads/'
                     if file_path.startswith('downloads/'):
                         # Just join with the base directory
-                        absolute_file_path = os.path.join(base_dir, file_path)
+                        absolute_file_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_path)
                     else:
                         # If not, add the downloads directory
-                        downloads_dir = os.path.join(base_dir, 'downloads')
                         absolute_file_path = os.path.join(downloads_dir, file_path)
                     
                     file_path = absolute_file_path
@@ -74,24 +73,22 @@ def get_lesson_pdf_path(lesson_id: str) -> Optional[str]:
                     return file_path
                 else:
                     print(f"❌ PDF file NOT found at path: {file_path}")
-                    # Try with alternative paths as a fallback
-                    alternatives = []
-                    
-                    # If path contains 'downloads/' try without it
-                    if 'downloads/' in file_path:
-                        base_name = os.path.basename(file_path)
-                        downloads_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'downloads')
-                        alt_path = os.path.join(downloads_dir, base_name)
-                        alternatives.append(alt_path)
-                    
-                    # Check alternatives
-                    for alt_path in alternatives:
-                        if os.path.exists(alt_path):
-                            print(f"✅ Found PDF at alternative path: {alt_path}")
-                            return alt_path
             
-            print(f"⚠️ No valid file_path found in database for lesson {lesson_id}")
-            return None
+            # If no file found in database or file doesn't exist, try to find it in downloads
+            print(f"Searching for PDF in downloads directory: {downloads_dir}")
+            
+            # Get all PDF files in the downloads directory
+            pdf_files = glob.glob(os.path.join(downloads_dir, '*.pdf'))
+            
+            if not pdf_files:
+                print("❌ No PDF files found in downloads directory")
+                return None
+            
+            # Try to find the most recent PDF file
+            latest_pdf = max(pdf_files, key=os.path.getctime)
+            print(f"✅ Found latest PDF file: {latest_pdf}")
+            return latest_pdf
+            
     except Exception as e:
         print(f"❌ Database error: {str(e)}")
         return None
