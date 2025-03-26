@@ -7,7 +7,7 @@ interface Config {
 const development: Config = {
     nodeApiUrl: 'http://localhost:3000',
     pythonApiUrl: 'http://localhost:8000',
-    wsUrl: 'ws://localhost:8080'
+    wsUrl: 'ws://localhost:8000'
 };
 
 const production: Config = {
