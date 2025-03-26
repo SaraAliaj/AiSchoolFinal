@@ -32,6 +32,7 @@ const sections: FormSection[] = [
 export default function PersonalInfoForm() {
   const [activeSection, setActiveSection] = useState('profile');
   const [showSaveAnimation, setShowSaveAnimation] = useState({ section: '', show: false });
+  const [savedSections, setSavedSections] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -98,6 +99,12 @@ export default function PersonalInfoForm() {
         if (savedData) {
           setFormData(JSON.parse(savedData));
         }
+        
+        // Get saved sections from localStorage
+        const saved = localStorage.getItem('savedSections');
+        if (saved) {
+          setSavedSections(JSON.parse(saved));
+        }
       } catch (error) {
         console.error('Error loading local data:', error);
       }
@@ -150,12 +157,11 @@ export default function PersonalInfoForm() {
       // Save to both API and localStorage
       await api.savePersonalInfo(sectionId, sectionData);
       localStorage.setItem('personalInfo', JSON.stringify(formData));
-
-      toast({
-        title: "Success",
-        description: `${sections.find(s => s.id === sectionId)?.title} data saved successfully.`,
-        variant: "default"
-      });
+      
+      // Add section to savedSections and store in localStorage
+      const updatedSavedSections = [...savedSections, sectionId];
+      setSavedSections(updatedSavedSections);
+      localStorage.setItem('savedSections', JSON.stringify(updatedSavedSections));
       
       // Hide save animation after 1.5 seconds
       setTimeout(() => {
@@ -187,7 +193,7 @@ export default function PersonalInfoForm() {
                 <User className="w-5 h-5 mr-2 text-primary" /> 
                 Student Profile
               </motion.h3>
-              {showSaveAnimation.section === 'profile' && showSaveAnimation.show && (
+              {(showSaveAnimation.section === 'profile' && showSaveAnimation.show || savedSections.includes('profile')) && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }} 
                   animate={{ opacity: 1, scale: 1 }}
@@ -304,7 +310,7 @@ export default function PersonalInfoForm() {
                 <Code className="w-5 h-5 mr-2 text-primary" /> 
                 Technical Computing Skills
               </motion.h3>
-              {showSaveAnimation.section === 'technical' && showSaveAnimation.show && (
+              {(showSaveAnimation.section === 'technical' && showSaveAnimation.show || savedSections.includes('technical')) && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }} 
                   animate={{ opacity: 1, scale: 1 }}
@@ -408,7 +414,7 @@ export default function PersonalInfoForm() {
                 <Book className="w-5 h-5 mr-2 text-primary" /> 
                 Programming and Development Expertise
               </motion.h3>
-              {showSaveAnimation.section === 'programming' && showSaveAnimation.show && (
+              {(showSaveAnimation.section === 'programming' && showSaveAnimation.show || savedSections.includes('programming')) && (
                 <motion.div 
                   initial={{ opacity: 0, scale: 0.8 }} 
                   animate={{ opacity: 1, scale: 1 }}
@@ -540,7 +546,25 @@ export default function PersonalInfoForm() {
       case 'database':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold mb-4">Database and Backend Development Skills</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <Database className="w-5 h-5 mr-2 text-primary" /> 
+                Database and Backend Development Skills
+              </motion.h3>
+              {(showSaveAnimation.section === 'database' && showSaveAnimation.show || savedSections.includes('database')) && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
             
             <div>
               <Label>Database Experience</Label>
@@ -597,7 +621,25 @@ export default function PersonalInfoForm() {
       case 'ai':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold mb-4">Emerging Technologies and Artificial Intelligence</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <Brain className="w-5 h-5 mr-2 text-primary" /> 
+                Emerging Technologies and Artificial Intelligence
+              </motion.h3>
+              {(showSaveAnimation.section === 'ai' && showSaveAnimation.show || savedSections.includes('ai')) && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
             
             <div className="space-y-4">
               <Label>AI Experience Level</Label>
@@ -653,7 +695,25 @@ export default function PersonalInfoForm() {
       case 'collaboration':
         return (
           <div className="space-y-6">
-            <h3 className="text-lg font-semibold mb-4">Collaboration and Problem-Solving</h3>
+            <div className="flex items-center justify-between mb-4">
+              <motion.h3 
+                initial={{ opacity: 0, x: -20 }} 
+                animate={{ opacity: 1, x: 0 }} 
+                className="text-lg font-semibold flex items-center"
+              >
+                <Users className="w-5 h-5 mr-2 text-primary" /> 
+                Collaboration and Problem-Solving
+              </motion.h3>
+              {(showSaveAnimation.section === 'collaboration' && showSaveAnimation.show || savedSections.includes('collaboration')) && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.8 }} 
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="bg-green-100 text-green-800 px-3 py-1 rounded-full flex items-center text-sm font-medium"
+                >
+                  <Check className="w-4 h-4 mr-1" /> Saved
+                </motion.div>
+              )}
+            </div>
             
             <div>
               <Label>Team Projects</Label>

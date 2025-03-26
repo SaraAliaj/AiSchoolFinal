@@ -28,7 +28,9 @@ import {
   StopCircle,
   CheckCircle,
   FileText,
-  Download
+  Download,
+  ClipboardList,
+  UserCog
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -518,53 +520,55 @@ export default function Layout() {
             <div className="flex-1 flex flex-col overflow-hidden">
               <nav className="flex-1 overflow-y-auto">
                 <div className={`space-y-4 ${isSidebarCollapsed ? 'p-2' : 'p-3'}`}>
-                  {/* Online Users Section - Moved to top */}
-                  <div className="bg-white rounded-lg shadow-sm">
-                    <div className="flex items-center justify-between p-4">
-                      <div className="flex items-center gap-2">
-                        <Users className="h-5 w-5 text-green-600" />
-                        <span className="text-base font-medium">Online Students</span>
-                      </div>
-                      <span className="bg-green-100 text-green-600 text-sm font-medium px-2 py-0.5 rounded-full">
-                        {onlineUsers.length}
-                      </span>
-                    </div>
-                    <div className="space-y-0.5">
-                      {onlineUsers.map((user) => (
-                        <div
-                          key={user.userId}
-                          className={cn(
-                            "flex items-center gap-2 px-4 py-2",
-                            user.role === 'lead_student' ? "bg-amber-50" : "bg-green-50"
-                          )}
-                        >
-                          <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            user.role === 'lead_student' ? "bg-orange-400" : "bg-green-500"
-                          )} />
-                          <div className="flex items-center gap-2">
-                            {user.role === 'lead_student' && (
-                              <Crown className="h-4 w-4 text-amber-500" />
-                            )}
-                            <span className="text-sm font-medium">
-                              {user.username} {user.surname}
-                            </span>
-                            {user.role === 'lead_student' && (
-                              <span className="text-sm text-amber-600">
-                                (Lead Student)
-                              </span>
-                            )}
-                          </div>
+                  {/* Online Users Section */}
+                  {!isSidebarCollapsed ? (
+                    <div className="bg-white rounded-lg shadow-sm">
+                      <div className="flex items-center justify-between p-4">
+                        <div className="flex items-center gap-2">
+                          <Users className="h-5 w-5 text-green-600" />
+                          <span className="text-base font-medium">Online Students</span>
                         </div>
-                      ))}
+                        <span className="bg-green-100 text-green-600 text-sm font-medium px-2 py-0.5 rounded-full">
+                          {onlineUsers.length}
+                        </span>
+                      </div>
+                      <div className="max-h-[120px] overflow-y-auto pr-1 custom-scrollbar space-y-0.5">
+                        {onlineUsers.map((user) => (
+                          <div
+                            key={user.userId}
+                            className={cn(
+                              "flex items-center gap-2 px-4 py-2",
+                              user.role === 'lead_student' ? "bg-amber-50" : "bg-green-50"
+                            )}
+                          >
+                            <div className={cn(
+                              "w-2 h-2 rounded-full",
+                              user.role === 'lead_student' ? "bg-orange-400" : "bg-green-500"
+                            )} />
+                            <div className="flex items-center gap-2">
+                              {user.role === 'lead_student' && (
+                                <Crown className="h-4 w-4 text-amber-500" />
+                              )}
+                              <span className="text-sm font-medium">
+                                {user.username} {user.surname}
+                              </span>
+                              {user.role === 'lead_student' && (
+                                <span className="text-sm text-amber-600">
+                                  (Lead Student)
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Collapsed version */}
-                  {isSidebarCollapsed && (
+                  ) : (
                     <div className="flex flex-col items-center gap-2">
-                      <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center">
+                      <div className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center relative">
                         <Users className="h-5 w-5 text-green-600" />
+                        <div className="absolute -top-2 -right-2 bg-green-100 text-green-600 text-xs font-medium px-2 py-0.5 rounded-full flex items-center justify-center min-w-[20px] border border-green-200 shadow-sm">
+                          {onlineUsers.length}
+                        </div>
                       </div>
                     </div>
                   )}
@@ -575,7 +579,7 @@ export default function Layout() {
                   </NavItem>
 
                   {/* Personal Information */}
-                  <NavItem to="/personal-info" icon={User} collapsed={isSidebarCollapsed}>
+                  <NavItem to="/personal-info" icon={GraduationCap} collapsed={isSidebarCollapsed}>
                     Personal Information
                   </NavItem>
 
