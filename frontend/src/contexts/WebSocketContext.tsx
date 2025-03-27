@@ -52,8 +52,8 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
     useEffect(() => {
         // Connect to the Socket.IO server
         const socketUrl = process.env.NODE_ENV === 'production' 
-            ? window.location.origin 
-            : 'http://localhost:3000';
+            ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+            : 'ws://localhost:3000';
 
         console.log('Connecting to Socket.IO server:', socketUrl);
         const manager = new Manager(socketUrl);
