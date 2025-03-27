@@ -98,7 +98,16 @@ function createServer(port, maxRetries = 3, attempt = 0) {
         }
 
         const server = http.createServer();
-        const wss = new WebSocketServer({ server });
+        const wss = new WebSocketServer({ 
+            server,
+            cors: {
+                origin: process.env.NODE_ENV === 'production' 
+                    ? ['*','https://aiacademia.tech/']  // Allow any origin in production
+                    : ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'],
+                methods: ["GET", "POST"],
+                credentials: true
+            }
+        });
 
         // Set up connection handler
         wss.on('connection', (ws) => {
