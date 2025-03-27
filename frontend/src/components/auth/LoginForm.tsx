@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from "framer-motion";
-import { Mail, Lock } from "lucide-react";
+import { Mail, Lock, Brain } from "lucide-react";
+import AuthBackground from "./AuthBackground";
 
 export default function LoginForm() {
   const [email, setEmail] = useState("");
@@ -58,101 +59,163 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen py-4 bg-[#f0f6ff]">
-      <div className="flex flex-col items-center w-full max-w-md mx-4">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col items-center mb-3"
-        >
-          <div className="flex items-center justify-center mb-1">
-            <img src="/favicon.svg" alt="AI Academia" className="h-10 w-10 text-[#333]" />
-            <h1 className="text-3xl font-bold ml-2 text-[#333]">AI Academia</h1>
-          </div>
-          <p className="text-[#666] italic text-sm">The Tirana school of AI where we make the government of Albania more efficient</p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="w-full"
-        >
-          <Card className="shadow-lg border-0">
-            <CardHeader className="space-y-1 py-3">
-              <CardTitle className="text-xl text-center font-bold">Login</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {error && (
+    <AuthBackground>
+      <div className="flex flex-col items-center justify-center min-h-screen py-4">
+        <div className="flex flex-col items-center w-full max-w-md mx-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center mb-3"
+          >
+            <div className="flex items-center justify-center mb-1">
+              <motion.div
+                initial={{ scale: 0.9 }}
+                animate={{ 
+                  rotate: [0, 10, 0, -10, 0],
+                  scale: [1, 1.1, 1],
+                }}
+                transition={{ 
+                  rotate: {
+                    duration: 5,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  },
+                  scale: {
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }
+                }}
+                className="relative flex items-center justify-center"
+              >
+                <Brain size={40} className="text-gray-700" />
                 <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="mb-3 p-2 text-red-500 bg-red-50 rounded-md text-sm"
+                  className="absolute inset-0 rounded-full border border-gray-400"
+                  initial={{ scale: 1, opacity: 0.7 }}
+                  animate={{ scale: 1.5, opacity: 0 }}
+                  transition={{ 
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeOut" 
+                  }}
+                />
+              </motion.div>
+              <h1 className="text-3xl font-bold ml-2 text-gray-800">AI Academia</h1>
+            </div>
+            <p className="text-gray-500 italic text-sm">The Tirana school of AI where we make the government of Albania more efficient</p>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-full"
+          >
+            <Card className="shadow-xl border-0 backdrop-blur-sm bg-white/90">
+              <CardHeader className="space-y-1 py-4">
+                <CardTitle className="text-xl text-center font-bold text-gray-800">Login</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {error && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-4 p-2 text-red-500 bg-red-50 rounded-md text-sm"
+                  >
+                    {error}
+                  </motion.div>
+                )}
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <motion.div 
+                    className="space-y-1"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                        <Mail size={16} />
+                      </div>
+                      <Input
+                        type="email"
+                        placeholder="Email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        className="h-11 pl-9 pr-4 bg-white/90 border-gray-200 focus:border-gray-400 focus:ring-gray-300"
+                      />
+                    </div>
+                  </motion.div>
+                  <motion.div 
+                    className="space-y-1"
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <div className="relative">
+                      <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">
+                        <Lock size={16} />
+                      </div>
+                      <Input
+                        type="password"
+                        placeholder="Password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        className="h-11 pl-9 pr-4 bg-white/90 border-gray-200 focus:border-gray-400 focus:ring-gray-300"
+                      />
+                    </div>
+                  </motion.div>
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Button 
+                      type="submit" 
+                      className="w-full h-11 bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-800 hover:to-black transition-all shadow-md"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <span className="flex items-center">
+                          <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Logging in...
+                        </span>
+                      ) : "Login"}
+                    </Button>
+                  </motion.div>
+                </form>
+                <motion.div 
+                  className="mt-4 text-center text-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
                 >
-                  {error}
+                  Don't have an account?{" "}
+                  <Link to="/register" className="text-gray-700 hover:text-black font-medium transition-colors">
+                    Register
+                  </Link>
                 </motion.div>
-              )}
-              <form onSubmit={handleSubmit} className="space-y-3">
-                <div className="space-y-1">
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
-                      <Mail size={16} />
-                    </div>
-                    <Input
-                      type="email"
-                      placeholder="Email address"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      className="h-10 pl-9 pr-4"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400">
-                      <Lock size={16} />
-                    </div>
-                    <Input
-                      type="password"
-                      placeholder="Password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={isLoading}
-                      className="h-10 pl-9 pr-4"
-                    />
-                  </div>
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full h-10 bg-[#1f2937] hover:bg-[#374151] transition-colors" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Logging in..." : "Login"}
-                </Button>
-              </form>
-              <div className="mt-4 text-center text-sm">
-                Don't have an account?{" "}
-                <Link to="/register" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
-                  Register
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-        
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="mt-4 text-xs text-gray-500"
-        >
-          © 2025 AI Academia. All rights reserved.
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
+          
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5, delay: 0.7 }}
+            className="mt-4 text-xs text-gray-500"
+          >
+            © 2025 AI Academia. All rights reserved.
+          </motion.div>
+        </div>
       </div>
-    </div>
+    </AuthBackground>
   );
 }

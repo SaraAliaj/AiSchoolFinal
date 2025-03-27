@@ -567,9 +567,9 @@ export default function LessonChatbot({
   };
 
   return (
-    <div className="flex h-screen gap-4 bg-slate-100 p-1">
+    <div className="flex h-full gap-4 bg-slate-100 p-1">
       {/* PDF Viewer Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-1rem)] bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
+      <div className="w-1/2 h-[calc(100vh-2rem)] bg-white rounded-xl shadow-lg overflow-hidden flex flex-col">
         {/* PDF Viewer Container */}
         <div className="flex-1 w-full bg-slate-50">
           <embed
@@ -582,12 +582,12 @@ export default function LessonChatbot({
       </div>
 
       {/* Chat Section - 50% width */}
-      <div className="w-1/2 h-[calc(100vh-1rem)] flex flex-col bg-white rounded-xl shadow-lg overflow-hidden">
-        {/* Chat header */}
-        <div className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
-              <BrainCircuit className="h-6 w-6 text-primary" />
+      <div className="w-1/2 h-[calc(100vh-2rem)] flex flex-col bg-white rounded-xl shadow-lg overflow-hidden">
+        {/* Chat header - reduced height */}
+        <div className="px-6 py-3 border-b bg-gradient-to-r from-primary/5 via-primary/10 to-transparent backdrop-blur-sm flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center shadow-inner border border-primary/5">
+              <BrainCircuit className="h-5 w-5 text-primary" />
             </div>
             <div>
               <h3 className="font-semibold text-slate-800 text-lg">Alba</h3>
@@ -596,31 +596,31 @@ export default function LessonChatbot({
           </div>
         </div>
         
-        {/* Messages area */}
-        <ScrollArea ref={scrollAreaRef} className="flex-1 px-6 py-6 bg-gradient-to-b from-slate-50/50 to-white/30">
-          <div className="space-y-8 max-w-[95%] mx-auto">
+        {/* Messages area - optimized for better space usage */}
+        <ScrollArea ref={scrollAreaRef} className="flex-1 px-5 py-4 bg-gradient-to-b from-slate-50/50 to-white/30">
+          <div className="space-y-5 max-w-[95%] mx-auto">
             {messages.map((message) => (
               <div
                 key={message.id}
-                className={`flex items-start gap-4 ${
+                className={`flex items-start gap-3 ${
                   message.sender === 'user' ? 'flex-row-reverse' : 'flex-row'
                 }`}
               >
                 {message.sender === 'user' ? (
-                  <Avatar className="h-9 w-9 border-2 border-primary/10 shadow-sm">
+                  <Avatar className="h-8 w-8 border-2 border-primary/10 shadow-sm">
                     <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/10 text-primary text-xs">
                       <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                 ) : (
-                  <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
-                    <BrainCircuit className="h-5 w-5 text-primary" />
+                  <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                    <BrainCircuit className="h-4 w-4 text-primary" />
                   </div>
                 )}
                 
-                <div className={`space-y-1.5 max-w-[85%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
+                <div className={`space-y-1 max-w-[85%] ${message.sender === 'user' ? 'items-end' : 'items-start'}`}>
                   <div
-                    className={`rounded-2xl px-5 py-3 shadow-sm transition-all duration-200 ${
+                    className={`rounded-2xl px-4 py-2.5 shadow-sm transition-all duration-200 ${
                       message.sender === 'user'
                         ? 'bg-gradient-to-r from-primary to-primary/90 text-primary-foreground rounded-tr-none'
                         : 'bg-white border border-slate-200 rounded-tl-none hover:shadow-md text-black'
@@ -638,20 +638,20 @@ export default function LessonChatbot({
             
             {/* Loading indicator */}
             {isLoading && (
-              <div className="flex items-start gap-4">
-                <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
-                  <BrainCircuit className="h-5 w-5 text-primary" />
+              <div className="flex items-start gap-3">
+                <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary/20 to-primary/10 border border-primary/5 flex items-center justify-center shadow-sm">
+                  <BrainCircuit className="h-4 w-4 text-primary" />
                 </div>
                 
-                <div className="space-y-1.5 max-w-[85%]">
-                  <div className="rounded-2xl rounded-tl-none px-5 py-4 bg-white border border-slate-200 shadow-sm">
+                <div className="space-y-1 max-w-[85%]">
+                  <div className="rounded-2xl rounded-tl-none px-4 py-3 bg-white border border-slate-200 shadow-sm">
                     <div className="flex items-center">
                       <div className="flex space-x-2">
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '0ms' }}></div>
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '300ms' }}></div>
                         <div className="w-2 h-2 rounded-full bg-primary/60 animate-pulse" style={{ animationDelay: '600ms' }}></div>
                       </div>
-                      <span className="ml-3 text-sm text-slate-400">Processing your request...</span>
+                      <span className="ml-3 text-sm text-slate-400">Processing...</span>
                     </div>
                   </div>
                 </div>
@@ -662,25 +662,25 @@ export default function LessonChatbot({
           </div>
         </ScrollArea>
 
-        {/* Input area */}
-        <div className="p-4 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm">
-          <form onSubmit={handleSubmit} className="flex gap-3 items-center">
+        {/* Input area - fixed height and compact */}
+        <div className="p-3 border-t bg-gradient-to-b from-white to-slate-50/80 backdrop-blur-sm mt-auto">
+          <form onSubmit={handleSubmit} className="flex gap-2 items-center">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="Ask about this lesson..."
               disabled={isLoading}
-              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 py-6 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
+              className="flex-1 border-slate-200 focus-visible:ring-primary/70 bg-white/80 py-4 rounded-xl shadow-sm hover:shadow-md transition-all duration-200"
             />
             <Button 
               type="submit" 
               disabled={isLoading}
-              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-xl h-12 w-12 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
+              className="bg-gradient-to-r from-primary to-primary/90 hover:opacity-90 transition-all duration-200 rounded-xl h-10 w-10 p-0 flex items-center justify-center shadow-lg hover:shadow-xl"
             >
               {isLoading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Send className="h-5 w-5" />
+                <Send className="h-4 w-4" />
               )}
             </Button>
           </form>
