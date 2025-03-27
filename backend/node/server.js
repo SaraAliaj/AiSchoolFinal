@@ -1555,28 +1555,45 @@ app.post('/api/chat', verifyToken, async (req, res) => {
         else if (messageLC.includes('javascript')) language = 'javascript';
 
         if (language) {
-          const [users] = await promisePool.query(`
-            SELECT DISTINCT u.username, u.surname, u.email, p.section_data
-            FROM users u
-            JOIN personal_information p ON u.id = p.user_id
-            WHERE p.section_name = 'programming'
-            AND JSON_EXTRACT(p.section_data, '$.languages.${language}') IS NOT NULL
-            AND JSON_EXTRACT(p.section_data, '$.languages.${language}') != ''
-          `);
+          try {
+            const [users] = await promisePool.query(`
+              SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+              FROM users u
+              JOIN personal_information p ON u.id = p.user_id
+              WHERE p.section_name = 'programming'
+              AND JSON_EXTRACT(p.section_data, '$.languages.${language}') IS NOT NULL
+              AND JSON_EXTRACT(p.section_data, '$.languages.${language}') != ''
+            `);
 
-          if (users.length > 0) {
-            const response = `💻 Found ${users.length} student(s) with ${language.charAt(0).toUpperCase() + language.slice(1)} experience:
+            if (users && users.length > 0) {
+              const response = `💻 Found ${users.length} student(s) with ${language.charAt(0).toUpperCase() + language.slice(1)} experience:
 
 ${users.map(user => {
-  const progData = JSON.parse(user.section_data);
-  return `• ${user.username} ${user.surname || ''}
+  try {
+    const progData = typeof user.section_data === 'string' ? 
+                     JSON.parse(user.section_data) : 
+                     user.section_data;
+                     
+    return `• ${user.username} ${user.surname || ''}
   📧 ${user.email}
-  📊 Level: ${progData.languages[language].toUpperCase()}`
+  📊 Level: ${progData?.languages?.[language]?.toUpperCase() || 'Not specified'}`;
+  } catch (err) {
+    console.error('Error parsing section data for user:', user.username, err);
+    return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  📊 Level: Not available`;
+  }
 }).join('\n\n')}`;
-            return res.json({ response });
-          } else {
+              return res.json({ response });
+            } else {
+              return res.json({ 
+                response: `I couldn't find any students with ${language.charAt(0).toUpperCase() + language.slice(1)} experience in the database.`
+              });
+            }
+          } catch (dbError) {
+            console.error('Database query error for language search:', dbError);
             return res.json({ 
-              response: `I couldn't find any students with ${language.charAt(0).toUpperCase() + language.slice(1)} experience in the database.`
+              response: `I encountered an error while searching for ${language} skills. The database might be missing the expected data structure.`
             });
           }
         }
@@ -1584,95 +1601,157 @@ ${users.map(user => {
 
       // Python skill query
       if (messageLC.includes('python') || messageLC.includes('advanced python') || messageLC.includes('experienced in python')) {
-        const [users] = await promisePool.query(`
-          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
-          FROM users u
-          JOIN personal_information p ON u.id = p.user_id
-          WHERE p.section_name = 'programming'
-          AND JSON_EXTRACT(p.section_data, '$.languages.python') = 'advanced'
-        `);
+        try {
+          const [users] = await promisePool.query(`
+            SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+            FROM users u
+            JOIN personal_information p ON u.id = p.user_id
+            WHERE p.section_name = 'programming'
+            AND JSON_EXTRACT(p.section_data, '$.languages.python') = 'advanced'
+          `);
 
-        if (users.length > 0) {
-          const response = `📊 Found ${users.length} student(s) advanced in Python:
+          if (users && users.length > 0) {
+            const response = `📊 Found ${users.length} student(s) advanced in Python:
 
 ${users.map(user => `• ${user.username} ${user.surname || ''}
   📧 ${user.email}`).join('\n\n')}`;
-          return res.json({ response });
+            return res.json({ response });
+          } else {
+            return res.json({ 
+              response: `I couldn't find any students with advanced Python skills in the database.`
+            });
+          }
+        } catch (dbError) {
+          console.error('Database query error for advanced Python search:', dbError);
+          return res.json({ 
+            response: `I encountered an error while searching for Python skills. The database might be missing the expected data structure.`
+          });
         }
       }
 
       // AI experience query
       if (messageLC.includes('ai') || messageLC.includes('artificial intelligence') || messageLC.includes('machine learning')) {
-        const [users] = await promisePool.query(`
-          SELECT DISTINCT u.username, u.surname, u.email, 
-                 p_ai.section_data as ai_data,
-                 p_prog.section_data as prog_data
-          FROM users u
-          JOIN personal_information p_ai ON u.id = p_ai.user_id
-          LEFT JOIN personal_information p_prog ON u.id = p_prog.user_id AND p_prog.section_name = 'programming'
-          WHERE p_ai.section_name = 'ai'
-          AND (
-            JSON_EXTRACT(p_ai.section_data, '$.aiExperience') IN ('advanced', 'practical')
-            OR JSON_EXTRACT(p_ai.section_data, '$.hasML') = true
-            OR JSON_EXTRACT(p_ai.section_data, '$.hasAIModels') = true
-          )
-        `);
+        try {
+          const [users] = await promisePool.query(`
+            SELECT DISTINCT u.username, u.surname, u.email, 
+                  p_ai.section_data as ai_data,
+                  p_prog.section_data as prog_data
+            FROM users u
+            JOIN personal_information p_ai ON u.id = p_ai.user_id
+            LEFT JOIN personal_information p_prog ON u.id = p_prog.user_id AND p_prog.section_name = 'programming'
+            WHERE p_ai.section_name = 'ai'
+            AND (
+              JSON_EXTRACT(p_ai.section_data, '$.aiExperience') IN ('advanced', 'practical')
+              OR JSON_EXTRACT(p_ai.section_data, '$.hasML') = true
+              OR JSON_EXTRACT(p_ai.section_data, '$.hasAIModels') = true
+            )
+          `);
 
-        if (users.length > 0) {
-          const response = `🤖 Found ${users.length} student(s) with AI experience:
+          if (users && users.length > 0) {
+            const response = `🤖 Found ${users.length} student(s) with AI experience:
 
 ${users.map(user => {
-  const aiData = JSON.parse(user.ai_data);
-  return `• ${user.username} ${user.surname || ''}
+  try {
+    const aiData = typeof user.ai_data === 'string' ? 
+                  JSON.parse(user.ai_data) : 
+                  user.ai_data;
+    return `• ${user.username} ${user.surname || ''}
   📧 ${user.email}
-  🎯 AI Experience: ${aiData.aiExperience || 'Not specified'}
-  🧠 Machine Learning: ${aiData.hasML ? '✓' : '×'}
-  🔬 AI Model Development: ${aiData.hasAIModels ? '✓' : '×'}
-  ${aiData.tools ? `🛠️ Tools: ${aiData.tools.join(', ')}` : ''}`
+  🎯 AI Experience: ${aiData?.aiExperience || 'Not specified'}
+  🧠 Machine Learning: ${aiData?.hasML ? '✓' : '×'}
+  🔬 AI Model Development: ${aiData?.hasAIModels ? '✓' : '×'}
+  ${aiData?.tools ? `🛠️ Tools: ${aiData.tools.join(', ')}` : ''}`
+  } catch (err) {
+    console.error('Error parsing AI data for user:', user.username, err);
+    return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  🎯 AI Experience: Not available`;
+  }
 }).join('\n\n')}`;
-          return res.json({ response });
+            return res.json({ response });
+          } else {
+            return res.json({ 
+              response: `I couldn't find any students with AI experience in the database.`
+            });
+          }
+        } catch (dbError) {
+          console.error('Database query error for AI experience search:', dbError);
+          return res.json({ 
+            response: `I encountered an error while searching for AI skills. The database might be missing the expected data structure.`
+          });
         }
       }
 
       // Database experience query
       if (messageLC.includes('database') || messageLC.includes('sql') || messageLC.includes('mysql')) {
-        const [users] = await promisePool.query(`
-          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
-          FROM users u
-          JOIN personal_information p ON u.id = p.user_id
-          WHERE p.section_name = 'database'
-          AND JSON_EXTRACT(p.section_data, '$.databaseSystems') IS NOT NULL
-        `);
+        try {
+          const [users] = await promisePool.query(`
+            SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+            FROM users u
+            JOIN personal_information p ON u.id = p.user_id
+            WHERE p.section_name = 'database'
+            AND JSON_EXTRACT(p.section_data, '$.databaseSystems') IS NOT NULL
+          `);
 
-        if (users.length > 0) {
-          const response = `💾 Found ${users.length} student(s) with database experience:
+          if (users && users.length > 0) {
+            const response = `💾 Found ${users.length} student(s) with database experience:
 
 ${users.map(user => {
-  const dbData = JSON.parse(user.section_data);
-  return `• ${user.username} ${user.surname || ''}
+  try {
+    const dbData = typeof user.section_data === 'string' ? 
+                  JSON.parse(user.section_data) : 
+                  user.section_data;
+    return `• ${user.username} ${user.surname || ''}
   📧 ${user.email}
-  🗄️ Database Systems: ${dbData.databaseSystems.join(', ')}`
+  🗄️ Database Systems: ${dbData?.databaseSystems?.join(', ') || 'Not specified'}`
+  } catch (err) {
+    console.error('Error parsing database data for user:', user.username, err);
+    return `• ${user.username} ${user.surname || ''}
+  📧 ${user.email}
+  🗄️ Database Systems: Not available`;
+  }
 }).join('\n\n')}`;
-          return res.json({ response });
+            return res.json({ response });
+          } else {
+            return res.json({ 
+              response: `I couldn't find any students with database experience in the database.`
+            });
+          }
+        } catch (dbError) {
+          console.error('Database query error for database experience search:', dbError);
+          return res.json({ 
+            response: `I encountered an error while searching for database skills. The database might be missing the expected data structure.`
+          });
         }
       }
 
       // Cloud experience query
       if (messageLC.includes('cloud') || messageLC.includes('aws') || messageLC.includes('azure')) {
-        const [users] = await promisePool.query(`
-          SELECT DISTINCT u.username, u.surname, u.email, p.section_data
-          FROM users u
-          JOIN personal_information p ON u.id = p.user_id
-          WHERE p.section_name = 'technical'
-          AND JSON_EXTRACT(p.section_data, '$.cloudExperience') = true
-        `);
+        try {
+          const [users] = await promisePool.query(`
+            SELECT DISTINCT u.username, u.surname, u.email, p.section_data
+            FROM users u
+            JOIN personal_information p ON u.id = p.user_id
+            WHERE p.section_name = 'technical'
+            AND JSON_EXTRACT(p.section_data, '$.cloudExperience') = true
+          `);
 
-        if (users.length > 0) {
-          const response = `☁️ Found ${users.length} student(s) with cloud experience:
+          if (users && users.length > 0) {
+            const response = `☁️ Found ${users.length} student(s) with cloud experience:
 
 ${users.map(user => `• ${user.username} ${user.surname || ''}
   📧 ${user.email}`).join('\n\n')}`;
-          return res.json({ response });
+            return res.json({ response });
+          } else {
+            return res.json({ 
+              response: `I couldn't find any students with cloud experience in the database.`
+            });
+          }
+        } catch (dbError) {
+          console.error('Database query error for cloud experience search:', dbError);
+          return res.json({ 
+            response: `I encountered an error while searching for cloud skills. The database might be missing the expected data structure.`
+          });
         }
       }
 
@@ -1754,71 +1833,139 @@ For example:
     }
 
     // Get personal information with explicit JSON handling
-    const [personalInfo] = await promisePool.query(
-      'SELECT section_name, JSON_EXTRACT(section_data, "$") as section_data FROM personal_information WHERE user_id = ?',
-      [user.id]
-    );
+    try {
+      const [personalInfo] = await promisePool.query(
+        'SELECT section_name, JSON_EXTRACT(section_data, "$") as section_data FROM personal_information WHERE user_id = ?',
+        [user.id]
+      );
 
-    console.log('Found personal info:', personalInfo);
+      console.log('Found personal info:', personalInfo);
 
-    if (personalInfo.length === 0) {
-      return res.json({
-        response: `📋 Student Information for ${user.username} ${user.surname || ''}\n📧 Email: ${user.email || 'Not provided'}\n\nNo additional personal information available for this user.`
-      });
-    }
+      if (!personalInfo || personalInfo.length === 0) {
+        return res.json({
+          response: `📋 Student Information for ${user.username} ${user.surname || ''}\n📧 Email: ${user.email || 'Not provided'}\n\nNo additional personal information available for this user.`
+        });
+      }
 
-    let response = `
+      // Safe accessor function to retrieve section data
+      const getSectionData = (sectionName, field = null) => {
+        try {
+          const section = personalInfo.find(s => s.section_name === sectionName);
+          if (!section || !section.section_data) return null;
+          
+          let data;
+          try {
+            // Handle cases where section_data might be a string or already parsed
+            data = typeof section.section_data === 'string' ? 
+                  JSON.parse(section.section_data) : 
+                  section.section_data;
+          } catch (e) {
+            console.error(`Error parsing ${sectionName} data:`, e);
+            return null;
+          }
+          
+          if (!field) return data;
+          return data[field] || null;
+        } catch (e) {
+          console.error(`Error accessing ${sectionName}.${field}:`, e);
+          return null;
+        }
+      };
+
+      // Get programming languages with error handling
+      let programmingLanguages = '';
+      try {
+        const languages = getSectionData('programming', 'languages') || {};
+        programmingLanguages = Object.entries(languages)
+          .filter(([_, level]) => level)
+          .map(([lang, level]) => `  • ${lang} (${level.toUpperCase()})`)
+          .join('\n') || '  • No programming languages specified';
+      } catch (e) {
+        console.error('Error processing programming languages:', e);
+        programmingLanguages = '  • Error retrieving programming languages';
+      }
+
+      // Get frameworks with error handling
+      let frameworks = '';
+      try {
+        const frameworksList = getSectionData('programming', 'frameworks') || [];
+        frameworks = frameworksList.map(framework => `  • ${framework}`).join('\n') || '  • No frameworks specified';
+      } catch (e) {
+        console.error('Error processing frameworks:', e);
+        frameworks = '  • Error retrieving frameworks';
+      }
+
+      // Get AI tools with error handling
+      let aiTools = '';
+      try {
+        const toolsList = getSectionData('ai', 'tools') || [];
+        aiTools = toolsList.map(tool => `  • ${tool}`).join('\n') || '  • No AI tools specified';
+      } catch (e) {
+        console.error('Error processing AI tools:', e);
+        aiTools = '  • Error retrieving AI tools';
+      }
+
+      // Get database systems with error handling
+      let databaseSystems = '';
+      try {
+        const dbSystems = getSectionData('database', 'databaseSystems') || [];
+        databaseSystems = dbSystems.map(db => `  • ${db}`).join('\n') || '  • No database systems specified';
+      } catch (e) {
+        console.error('Error processing database systems:', e);
+        databaseSystems = '  • Error retrieving database systems';
+      }
+
+      let response = `
 👤 STUDENT PROFILE
 
 
 🔹 Name: ${user.username.toUpperCase()} ${user.surname ? user.surname.toUpperCase() : ''}
 🔹 Email: ${user.email || 'Not provided'}
-🔹 Phone: ${personalInfo.find(s => s.section_name === 'profile')?.section_data?.phone || 'Not provided'}
-🔹 Age: ${personalInfo.find(s => s.section_name === 'profile')?.section_data?.age || 'Not provided'}
+🔹 Phone: ${getSectionData('profile', 'phone') || 'Not provided'}
+🔹 Age: ${getSectionData('profile', 'age') || 'Not provided'}
 
 🧠 TECHNICAL SKILLS
 ----------------------
 
 💻 Programming Languages:
-${Object.entries(personalInfo.find(s => s.section_name === 'programming')?.section_data?.languages || {})
-  .filter(([_, level]) => level)
-  .map(([lang, level]) => `  • ${lang} (${level.toUpperCase()})`)
-  .join('\n') || '  • No programming languages specified'}
+${programmingLanguages}
 
 🧱 Development Stack:
-${personalInfo.find(s => s.section_name === 'programming')?.section_data?.frameworks?.map(framework => 
-  `  • ${framework}`).join('\n') || '  • No frameworks specified'}
+${frameworks}
 
-📊 Technical Level: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.technicalProficiency?.toUpperCase() || 'Not specified'}
+📊 Technical Level: ${getSectionData('technical', 'technicalProficiency')?.toUpperCase() || 'Not specified'}
 
 🤖 AI & DATA ENGINEERING
 ----------------------
 
-🎯 AI Experience: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.aiExperience?.toUpperCase() || 'None'}
-🔎 Machine Learning: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.hasML ? '✅' : '❌'}
-🧪 Model Development: ${personalInfo.find(s => s.section_name === 'ai')?.section_data?.hasAIModels ? '✅' : '❌'}
+🎯 AI Experience: ${getSectionData('ai', 'aiExperience')?.toUpperCase() || 'None'}
+🔎 Machine Learning: ${getSectionData('ai', 'hasML') ? '✅' : '❌'}
+🧪 Model Development: ${getSectionData('ai', 'hasAIModels') ? '✅' : '❌'}
 
 🛠️ AI Tools:
-${personalInfo.find(s => s.section_name === 'ai')?.section_data?.tools?.map(tool => 
-  `  • ${tool}`).join('\n') || '  • No AI tools specified'}
+${aiTools}
 
 🗃️ Databases:
-${personalInfo.find(s => s.section_name === 'database')?.section_data?.databaseSystems?.map(db => 
-  `  • ${db}`).join('\n') || '  • No database systems specified'}
+${databaseSystems}
 
 💼 PROFESSIONAL EXPERIENCE
 ----------------------
 
-🤝 Team Role: ${personalInfo.find(s => s.section_name === 'collaboration')?.section_data?.collaborationRole?.toUpperCase() || 'Not specified'}
-🏆 Competitions: ${personalInfo.find(s => s.section_name === 'collaboration')?.section_data?.hasCompetitions ? '✅' : '❌'}
+🤝 Team Role: ${getSectionData('collaboration', 'collaborationRole')?.toUpperCase() || 'Not specified'}
+🏆 Competitions: ${getSectionData('collaboration', 'hasCompetitions') ? '✅' : '❌'}
 
-☁️ Cloud Computing: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.cloudExperience ? '✅' : '❌'}
-📦 VM/Container Usage: ${personalInfo.find(s => s.section_name === 'technical')?.section_data?.vmExperience ? '✅' : '❌'}
-🌐 Open Source Contributions: ${personalInfo.find(s => s.section_name === 'programming')?.section_data?.hasOpenSource ? '✅' : '❌'}
+☁️ Cloud Computing: ${getSectionData('technical', 'cloudExperience') ? '✅' : '❌'}
+📦 VM/Container Usage: ${getSectionData('technical', 'vmExperience') ? '✅' : '❌'}
+🌐 Open Source Contributions: ${getSectionData('programming', 'hasOpenSource') ? '✅' : '❌'}
 `;
 
-return res.json({ response: response.trim() });
-
+      return res.json({ response: response.trim() });
+    } catch (error) {
+      console.error('Error processing personal information:', error);
+      return res.json({
+        response: `📋 Student Information for ${user.username} ${user.surname || ''}\n📧 Email: ${user.email || 'Not provided'}\n\nI encountered an error retrieving detailed information for this user.`
+      });
+    }
   } catch (error) {
     console.error('Error in chat endpoint:', error);
     return res.status(500).json({ error: 'An error occurred processing your request' });
