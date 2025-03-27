@@ -230,11 +230,12 @@ app.post('/api/auth/login', async (req, res) => {
       const user = users[0];
       console.log('User found:', { id: user.id, email: user.email, role: user.role });
 
-      // Check if user is active
-      if (!user.active) {
-        console.log('Inactive user attempted login:', email);
-        return res.status(401).json({ message: 'Account is deactivated' });
-      }
+      // Remove active status check to allow users to login regardless of status
+      // Always set user to active upon successful login
+      await connection.query(
+        'UPDATE users SET active = TRUE, last_activity = CURRENT_TIMESTAMP WHERE id = ?',
+        [user.id]
+      );
 
       // Verify password
       const validPassword = await bcrypt.compare(password, user.password);
@@ -337,13 +338,10 @@ app.post('/api/auth/register', async (req, res) => {
       const role = (username.toLowerCase() === 'admin' && surname.toLowerCase() === 'admin') ? 'admin' : 'student';
       console.log(`Assigning role: ${role} for user: ${username} ${surname}`);
 
-      // Combine username and surname for the name field
-      const fullName = `${username} ${surname || ''}`.trim();
-
-      // Insert new user with determined role and name
+      // Insert new user with determined role
       const [result] = await connection.query(
-        'INSERT INTO users (username, surname, name, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [username, surname, fullName, email, hashedPassword, role, true]
+        'INSERT INTO users (username, surname, email, password, role, active) VALUES (?, ?, ?, ?, ?, ?)',
+        [username, surname, email, hashedPassword, role, true]
       );
 
       console.log('User registered successfully:', { id: result.insertId, role });
@@ -360,7 +358,6 @@ app.post('/api/auth/register', async (req, res) => {
           id: result.insertId,
           username,
           surname,
-          name: fullName,
           email,
           role,
           active: true
