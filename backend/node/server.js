@@ -79,6 +79,15 @@ const testDatabaseConnection = async () => {
     return true;
   } catch (error) {
     console.error('Failed to connect to MySQL database:', error);
+    // Log detailed error information for debugging
+    console.error('Database connection error details:', {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      host: DB_HOST,
+      port: DB_PORT,
+      user: DB_USER
+    });
     return false;
   }
 };
@@ -1287,23 +1296,25 @@ setInterval(async () => {
 // Update the startServer function
 const startServer = async () => {
   try {
-    // Test database connection
-    const dbConnected = await testDatabaseConnection();
-    if (!dbConnected) {
-      throw new Error('Failed to connect to database');
-    }
-    
-    // Ensure tables exist
-    const tablesCreated = await ensureTablesExist();
-    if (!tablesCreated) {
-      throw new Error('Failed to create/verify database tables');
-    }
-    
     // Get PORT from environment variable
     const PORT = process.env.PORT || 3000;
     console.log(`Starting server with PORT=${PORT}`);
     
-    // Start the HTTP server
+    // Test database connection - but continue even if it fails
+    const dbConnected = await testDatabaseConnection();
+    if (!dbConnected) {
+      console.warn('WARNING: Database connection failed, but server will continue to start.');
+      console.warn('Some database-dependent endpoints will not function correctly.');
+    } else {
+      // Only try to ensure tables exist if the database is connected
+      const tablesCreated = await ensureTablesExist();
+      if (!tablesCreated) {
+        console.warn('WARNING: Failed to create/verify database tables, but server will continue to start.');
+        console.warn('Some database-dependent endpoints may not function correctly.');
+      }
+    }
+    
+    // Start the HTTP server regardless of database status
     httpServer.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);
       console.log(`Frontend URL: ${FRONTEND_URL}`);
@@ -1311,7 +1322,13 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    // Don't exit - try to start the server anyway
+    const PORT = process.env.PORT || 3000;
+    console.log(`Attempting to start server despite errors on port ${PORT}`);
+    
+    httpServer.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running with limited functionality on port ${PORT}`);
+    });
   }
 };
 
@@ -2143,6 +2160,21 @@ app.get('/api/today-lesson', async (req, res) => {
     const dayId = today === 0 ? 5 : today; // Use 5 (Friday) instead of 7 for Sunday
     
     console.log('Fetching lesson for day:', dayId);
+    
+    // First check if database connection is available by performing a simple test query
+    try {
+      await promisePool.query('SELECT 1');
+    } catch (dbConnectionError) {
+      console.error('Database connection not available:', dbConnectionError.message);
+      // Return a fallback response when database is not available
+      return res.status(200).json({
+        title: 'Today\'s Lessons',
+        lesson_name: 'Database access currently unavailable',
+        message: 'Connection to database is not available, showing fallback content',
+        day_name: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][today],
+        day: today
+      });
+    }
     
     try {
       // Check if lessons table exists first

@@ -5,7 +5,12 @@ import 'dotenv/config';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Connection configurations
-const DB_HOST = isProduction ? 'quiz-database-8ags' : 'localhost';
+// Use the full domain if provided in the environment variable
+const DB_HOST_ENV = process.env.DB_HOST || '';
+// Check if DB_HOST contains domain information, use it directly if it does
+const DB_HOST = isProduction 
+    ? (DB_HOST_ENV.includes('.') ? DB_HOST_ENV : 'quiz-database-8ags.onrender.com')
+    : 'localhost';
 const DB_PORT = process.env.DB_PORT || 3306;
 const DB_USER = process.env.DB_USER || 'Sara'
 const DB_PASSWORD = process.env.DB_PASSWORD || 'Sara0330!!';

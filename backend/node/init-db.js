@@ -188,5 +188,8 @@ initializeDatabase()
     })
     .catch((error) => {
         console.error('Database initialization failed:', error);
-        process.exit(1);
+        // Don't exit with error code - this allows the app to continue
+        // even without database connection
+        console.log('Continuing application startup despite database initialization failure');
+        process.exit(0);
     }); 
