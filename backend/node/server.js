@@ -2130,26 +2130,81 @@ app.get('/api/today-lesson', verifyToken, async (req, res) => {
     
     console.log('Fetching lesson for day:', dayId);
     
-    // Simplified query to get any lesson for this day
+    // Improved query to get any lesson for this day with more details
     const query = `
-      SELECT l.title, l.lesson_name
+      SELECT 
+        l.id, 
+        l.lesson_name,
+        COALESCE(l.title, l.lesson_name) as title,
+        l.course_id, 
+        l.week_id, 
+        l.day_id, 
+        l.file_path,
+        c.name as course_name, 
+        w.name as week_name, 
+        d.day_name as day_name
       FROM lessons l
+      JOIN courses c ON l.course_id = c.id
+      JOIN weeks w ON l.week_id = w.id
+      JOIN days d ON l.day_id = d.id
       WHERE l.day_id = ?
-      ORDER BY l.week_id ASC, l.order_index ASC
+      ORDER BY l.week_id ASC, l.id ASC
       LIMIT 1
     `;
     
     const [rows] = await promisePool.query(query, [dayId]);
     console.log('Query result:', rows);
     
-    if (rows.length === 0) {
-      return res.status(404).json({ message: 'No lesson found for today' });
+    if (!rows || rows.length === 0) {
+      console.log('No lesson found for today (day_id:', dayId, ')');
+      
+      // Fallback to any lesson if no lesson for today
+      const fallbackQuery = `
+        SELECT 
+          l.id, 
+          l.lesson_name,
+          COALESCE(l.title, l.lesson_name) as title,
+          l.course_id, 
+          l.week_id, 
+          l.day_id, 
+          l.file_path,
+          c.name as course_name, 
+          w.name as week_name, 
+          d.day_name as day_name
+        FROM lessons l
+        JOIN courses c ON l.course_id = c.id
+        JOIN weeks w ON l.week_id = w.id
+        JOIN days d ON l.day_id = d.id
+        ORDER BY l.id ASC
+        LIMIT 1
+      `;
+      
+      const [fallbackRows] = await promisePool.query(fallbackQuery);
+      
+      if (!fallbackRows || fallbackRows.length === 0) {
+        return res.status(404).json({ 
+          message: 'No lessons found',
+          status: 'error' 
+        });
+      }
+      
+      console.log('Using fallback lesson:', fallbackRows[0]);
+      return res.json({ 
+        ...fallbackRows[0],
+        isFallback: true
+      });
     }
     
+    // Set the content type explicitly
+    res.setHeader('Content-Type', 'application/json');
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching today\'s lesson:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      status: 'error'
+    });
   }
 });
 
