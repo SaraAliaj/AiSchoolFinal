@@ -100,7 +100,7 @@ export default function Chat() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        const wsUrl = `${config.wsUrl}/grok`;
+        const wsUrl = config.getWebSocketUrl() + '/grok';
         console.log('Connecting to WebSocket at:', wsUrl);
         
         const ws = new WebSocket(wsUrl);
@@ -109,6 +109,20 @@ export default function Chat() {
           console.log('Connected to Grok AI WebSocket server');
           socketRef.current = ws;
           setWsConnected(true);
+          
+          // When connected, send a ping message to keep the connection alive
+          const pingInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'ping' }));
+            } else {
+              clearInterval(pingInterval);
+            }
+          }, 30000); // Send ping every 30 seconds
+          
+          // Clear interval on socket close
+          ws.addEventListener('close', () => {
+            clearInterval(pingInterval);
+          });
         };
         
         ws.onmessage = (event) => {
@@ -126,17 +140,20 @@ export default function Chat() {
               messageContent = event.data;
             }
 
-            // Add a slight delay before showing the AI response to ensure the loading animation is visible
-            setTimeout(() => {
-              const aiMessage: Message = {
-                id: Date.now().toString(),
-                content: messageContent,
-                sender: 'ai',
-                timestamp: new Date()
-              };
-              setMessages(prev => [...prev, aiMessage]);
-              setIsLoading(false);
-            }, 500);
+            // Only add message if it's not a ping response
+            if (messageContent !== 'pong' && messageContent !== '{"type":"pong"}') {
+              // Add a slight delay before showing the AI response
+              setTimeout(() => {
+                const aiMessage: Message = {
+                  id: Date.now().toString(),
+                  content: messageContent,
+                  sender: 'ai',
+                  timestamp: new Date()
+                };
+                setMessages(prev => [...prev, aiMessage]);
+                setIsLoading(false);
+              }, 500);
+            }
           } catch (e) {
             console.error('Error processing message:', e);
             const errorMessage: Message = {
@@ -154,22 +171,62 @@ export default function Chat() {
           console.error('WebSocket error:', error);
           setIsLoading(false);
           setWsConnected(false);
+          
+          // Show a toast notification about the error
           toast({
             title: "Connection Error",
             description: "Could not connect to the AI service. Will try again shortly.",
-            variant: "destructive"
+            variant: "destructive",
+            duration: 5000
           });
+          
+          // Send a fallback AI message letting the user know about the connection issue
+          const errorMessage: Message = {
+            id: Date.now().toString(),
+            content: "I'm having trouble connecting to the server right now. You can try again in a moment, or use the HTTP endpoint by asking about people (e.g., 'Tell me about Sara').",
+            sender: 'ai',
+            timestamp: new Date()
+          };
+          setMessages(prev => [...prev, errorMessage]);
         };
         
-        ws.onclose = () => {
-          console.log('WebSocket connection closed');
+        ws.onclose = (event) => {
+          console.log('WebSocket connection closed:', event.code, event.reason);
           setWsConnected(false);
+          
+          // Only show a message if this was an abnormal closure
+          if (event.code !== 1000 && event.code !== 1001) {
+            const errorMessage: Message = {
+              id: Date.now().toString(),
+              content: "The connection to the AI service was lost. I'll try to reconnect automatically.",
+              sender: 'ai',
+              timestamp: new Date()
+            };
+            setMessages(prev => {
+              // Only add the message if it's not already the last one
+              const lastMsg = prev[prev.length - 1];
+              if (lastMsg && lastMsg.content.includes("connection to the AI service was lost")) {
+                return prev;
+              }
+              return [...prev, errorMessage];
+            });
+          }
+          
           setTimeout(connectWebSocket, 3000);
         };
       } catch (error) {
         console.error('Failed to connect to WebSocket:', error);
         setWsConnected(false);
-        setTimeout(connectWebSocket, 3000);
+        
+        // Show a toast notification about the error
+        toast({
+          title: "Connection Error",
+          description: "Could not connect to the AI service: " + (error as Error).message,
+          variant: "destructive",
+          duration: 5000
+        });
+        
+        setTimeout(connectWebSocket, 5000);
       }
     };
 

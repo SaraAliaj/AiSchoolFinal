@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useToast } from '@/components/ui/use-toast';
 import { Manager } from 'socket.io-client';
+import config from '@/config';
 
 interface User {
     userId: string;
@@ -22,13 +23,23 @@ interface WebSocketContextType {
     onlineUsers: User[];
 }
 
-const WebSocketContext = createContext<WebSocketContextType | null>(null);
+// Create a default context value to avoid the "must be used within a provider" error
+const defaultContextValue: WebSocketContextType = {
+    startLesson: () => console.warn('WebSocket not connected'),
+    endLesson: () => console.warn('WebSocket not connected'),
+    isConnected: false,
+    showStartNotification: false,
+    showEndNotification: false,
+    notificationData: { lessonName: '' },
+    setShowStartNotification: () => {},
+    setShowEndNotification: () => {},
+    onlineUsers: []
+};
+
+const WebSocketContext = createContext<WebSocketContextType>(defaultContextValue);
 
 export const useWebSocket = () => {
     const context = useContext(WebSocketContext);
-    if (!context) {
-        throw new Error('useWebSocket must be used within a WebSocketProvider');
-    }
     return context;
 };
 
@@ -56,110 +67,163 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
             return;
         }
 
-        // Connect to the Socket.IO server
-        const socketUrl = process.env.NODE_ENV === 'production' 
-            ? 'wss://quiz-node-backend.onrender.com'
-            : 'ws://localhost:3000';
-
+        // Connect to the Socket.IO server using the dynamic config
+        const socketUrl = config.getWebSocketUrl();
         console.log('Connecting to Socket.IO server:', socketUrl);
-        const manager = new Manager(socketUrl);
-        const newSocket = manager.socket('/');
 
-        // Handle connection events
-        newSocket.on('connect', () => {
-            console.log('Connected to Socket.IO server');
-            setIsConnected(true);
-            if (userId) {
-                console.log('Authenticating with userId:', userId);
-                newSocket.emit('authenticate', userId);
-            }
-        });
-
-        // Handle notifications
-        newSocket.on('notification', (data) => {
-            console.log('Received notification:', data);
-            const lessonName = data.lessonName || 'Unknown Lesson';
-            const userName = data.userName || 'Unknown User';
-            
-            setNotificationData({
-                lessonName: `${lessonName} - ${data.type === 'lesson_started' ? 'Started' : 'Ended'} by ${userName}`
+        try {
+            const manager = new Manager(socketUrl, {
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                timeout: 10000
             });
-
-            if (data.type === 'lesson_started') {
-                setShowStartNotification(true);
-                toast({
-                    title: "Lesson Started",
-                    description: `${lessonName} has been started by ${userName}`,
-                    duration: 5000
-                });
-            } else if (data.type === 'lesson_ended') {
-                setShowEndNotification(true);
-                toast({
-                    title: "Lesson Ended",
-                    description: `${lessonName} has been ended by ${userName}`,
-                    duration: 5000
-                });
-            }
-        });
-
-        // Handle initial online users list
-        newSocket.on('online_users', (users: User[]) => {
-            console.log('Received initial online users list:', users);
-            const activeUsers = users.filter(user => user.active);
-            console.log('Filtered active users:', activeUsers);
-            setOnlineUsers(activeUsers);
-        });
-
-        // Handle user status changes
-        newSocket.on('user_status_change', (userInfo: User) => {
-            console.log('User status change received:', userInfo);
             
-            setOnlineUsers(prev => {
-                let updatedUsers;
-                if (userInfo.active) {
-                    // Add or update user
-                    updatedUsers = [
-                        ...prev.filter(u => u.userId !== userInfo.userId),
-                        userInfo
-                    ].sort((a, b) => {
-                        // Sort by role (lead_student first) then by username
-                        if (a.role === 'lead_student' && b.role !== 'lead_student') return -1;
-                        if (a.role !== 'lead_student' && b.role === 'lead_student') return 1;
-                        return a.username.localeCompare(b.username);
-                    });
-                } else {
-                    // Remove user
-                    updatedUsers = prev.filter(u => u.userId !== userInfo.userId);
+            const newSocket = manager.socket('/');
+
+            // Handle connection events
+            newSocket.on('connect', () => {
+                console.log('Connected to Socket.IO server');
+                setIsConnected(true);
+                
+                if (userId) {
+                    console.log('Authenticating with userId:', userId);
+                    newSocket.emit('authenticate', userId);
                 }
                 
-                console.log('Updated online users list:', updatedUsers);
-                return updatedUsers;
+                toast({
+                    title: "Connected",
+                    description: "Connected to the notification service",
+                    duration: 3000
+                });
             });
-        });
 
-        newSocket.on('disconnect', () => {
-            console.log('Disconnected from Socket.IO server');
-            setIsConnected(false);
-        });
+            // Handle notifications
+            newSocket.on('notification', (data) => {
+                console.log('Received notification:', data);
+                const lessonName = data.lessonName || 'Unknown Lesson';
+                const userName = data.userName || 'Unknown User';
+                
+                setNotificationData({
+                    lessonName: `${lessonName} - ${data.type === 'lesson_started' ? 'Started' : 'Ended'} by ${userName}`
+                });
 
-        // Handle reconnection
-        newSocket.on('reconnect', () => {
-            console.log('Reconnected to Socket.IO server');
-            if (userId) {
-                console.log('Re-authenticating after reconnection');
-                newSocket.emit('authenticate', userId);
-            }
-        });
+                if (data.type === 'lesson_started') {
+                    setShowStartNotification(true);
+                    toast({
+                        title: "Lesson Started",
+                        description: `${lessonName} has been started by ${userName}`,
+                        duration: 5000
+                    });
+                } else if (data.type === 'lesson_ended') {
+                    setShowEndNotification(true);
+                    toast({
+                        title: "Lesson Ended",
+                        description: `${lessonName} has been ended by ${userName}`,
+                        duration: 5000
+                    });
+                }
+            });
 
-        setSocket(newSocket);
+            // Handle initial online users list
+            newSocket.on('online_users', (users: User[]) => {
+                console.log('Received initial online users list:', users);
+                const activeUsers = users.filter(user => user.active);
+                console.log('Filtered active users:', activeUsers);
+                setOnlineUsers(activeUsers);
+            });
 
-        // Cleanup function
-        return () => {
-            console.log('Cleaning up WebSocket connection');
-            if (newSocket?.connected) {
-                newSocket.disconnect();
-            }
-        };
+            // Handle user status changes
+            newSocket.on('user_status_change', (userInfo: User) => {
+                console.log('User status change received:', userInfo);
+                
+                setOnlineUsers(prev => {
+                    let updatedUsers;
+                    if (userInfo.active) {
+                        // Add or update user
+                        updatedUsers = [
+                            ...prev.filter(u => u.userId !== userInfo.userId),
+                            userInfo
+                        ].sort((a, b) => {
+                            // Sort by role (lead_student first) then by username
+                            if (a.role === 'lead_student' && b.role !== 'lead_student') return -1;
+                            if (a.role !== 'lead_student' && b.role === 'lead_student') return 1;
+                            return a.username.localeCompare(b.username);
+                        });
+                    } else {
+                        // Remove user
+                        updatedUsers = prev.filter(u => u.userId !== userInfo.userId);
+                    }
+                    
+                    console.log('Updated online users list:', updatedUsers);
+                    return updatedUsers;
+                });
+            });
+
+            newSocket.on('disconnect', () => {
+                console.log('Disconnected from Socket.IO server');
+                setIsConnected(false);
+            });
+
+            // Handle connection errors
+            newSocket.on('connect_error', (error) => {
+                console.error('Socket.IO connection error:', error);
+                toast({
+                    title: "Connection Error",
+                    description: "Failed to connect to notification service",
+                    variant: "destructive",
+                    duration: 5000
+                });
+            });
+
+            // Handle reconnection
+            newSocket.on('reconnect', (attemptNumber) => {
+                console.log(`Reconnected to Socket.IO server after ${attemptNumber} attempts`);
+                if (userId) {
+                    console.log('Re-authenticating after reconnection');
+                    newSocket.emit('authenticate', userId);
+                }
+                
+                toast({
+                    title: "Reconnected",
+                    description: "Reconnected to the notification service",
+                    duration: 3000
+                });
+            });
+
+            // Handle reconnection errors
+            newSocket.on('reconnect_error', (error) => {
+                console.error('Socket.IO reconnection error:', error);
+            });
+
+            // Handle reconnection failure
+            newSocket.on('reconnect_failed', () => {
+                console.error('Socket.IO reconnection failed after all attempts');
+                toast({
+                    title: "Connection Failed",
+                    description: "Could not reconnect to the notification service",
+                    variant: "destructive",
+                    duration: 5000
+                });
+            });
+
+            setSocket(newSocket);
+
+            // Cleanup function
+            return () => {
+                console.log('Cleaning up WebSocket connection');
+                if (newSocket?.connected) {
+                    newSocket.disconnect();
+                }
+            };
+        } catch (error) {
+            console.error('Error setting up Socket.IO connection:', error);
+            toast({
+                title: "Connection Error",
+                description: "Could not set up notification service",
+                variant: "destructive",
+                duration: 5000
+            });
+        }
     }, [userId, toast]);
 
     const startLesson = (lessonId: string, userName: string, lessonName: string) => {
@@ -167,6 +231,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
             socket.emit('startLesson', { lessonId, userName, lessonName });
         } else {
             console.error('Socket not connected');
+            toast({
+                title: "Not Connected",
+                description: "Cannot start lesson - not connected to server",
+                variant: "destructive",
+                duration: 3000
+            });
         }
     };
 
@@ -175,6 +245,12 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
             socket.emit('endLesson', { lessonId, userName, lessonName });
         } else {
             console.error('Socket not connected');
+            toast({
+                title: "Not Connected",
+                description: "Cannot end lesson - not connected to server",
+                variant: "destructive",
+                duration: 3000
+            });
         }
     };
 
