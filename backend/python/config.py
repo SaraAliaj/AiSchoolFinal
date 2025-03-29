@@ -20,8 +20,8 @@ class Config:
     DB_HOST = os.getenv("DB_HOST")
     if not DB_HOST:
         if IS_PRODUCTION:
-            # In production, if DB_HOST isn't set, default to the render internal service
-            DB_HOST = "quiz-database-8ags"
+            # In production, if DB_HOST isn't set, use the render database URL with full domain
+            DB_HOST = "quiz-database-8ags.onrender.com"
             print(f"⚠️ DB_HOST not set, defaulting to production DB: {DB_HOST}")
         else:
             DB_HOST = "localhost"
