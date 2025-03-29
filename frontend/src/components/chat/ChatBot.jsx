@@ -6,7 +6,8 @@ import config from '@/config';
 
 // Get the WebSocket URL based on the current environment
 const getWebSocketUrl = () => {
-  return `${config.wsUrl}/grok`;
+  // Use the configured WebSocket URL directly - don't append /grok
+  return `${config.wsUrl}`;
 };
 
 const ChatBot = ({ lessonId }) => {

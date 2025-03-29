@@ -8,7 +8,7 @@ interface Config {
 const development: Config = {
     nodeApiUrl: 'http://localhost:3000',
     pythonApiUrl: 'http://localhost:8000',
-    wsUrl: 'ws://localhost:8000',
+    wsUrl: 'ws://localhost:8082',
     getWebSocketUrl: function() {
         return this.wsUrl;
     }
@@ -17,7 +17,7 @@ const development: Config = {
 const production: Config = {
     nodeApiUrl: 'https://quiz-node-backend.onrender.com',
     pythonApiUrl: 'https://quiz-python-backend.onrender.com',
-    wsUrl: 'wss://quiz-python-backend.onrender.com',
+    wsUrl: 'wss://quiz-python-backend.onrender.com/ws',
     getWebSocketUrl: function() {
         // Dynamically create WebSocket URL based on current hostname
         if (typeof window !== 'undefined') {
@@ -25,13 +25,13 @@ const production: Config = {
             
             // If we're on the aiacademia.tech domain, use the correct backend
             if (window.location.hostname === 'aiacademia.tech') {
-                return 'wss://quiz-python-backend.onrender.com';
+                return 'wss://quiz-python-backend.onrender.com/ws';
             }
             
             // For Render preview URLs or localhost, derive from current hostname
             // This handles both production and development without hardcoding
             if (window.location.hostname.includes('render.com')) {
-                return 'wss://quiz-python-backend.onrender.com';
+                return 'wss://quiz-python-backend.onrender.com/ws';
             }
             
             // Fallback for development or unknown environments

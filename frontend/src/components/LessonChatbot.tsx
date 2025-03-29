@@ -100,7 +100,7 @@ export default function LessonChatbot({
     const tryConnect = () => {
       console.log('Connecting to WebSocket server...');
       
-      const wsUrl = `${config.wsUrl}/grok`;
+      const wsUrl = config.getWebSocketUrl();
       console.log('Using WebSocket URL:', wsUrl);
       
       const ws = new WebSocket(wsUrl);

@@ -100,7 +100,7 @@ export default function Chat() {
   useEffect(() => {
     const connectWebSocket = () => {
       try {
-        const wsUrl = config.getWebSocketUrl() + '/grok';
+        const wsUrl = config.getWebSocketUrl();
         console.log('Connecting to WebSocket at:', wsUrl);
         
         const ws = new WebSocket(wsUrl);
