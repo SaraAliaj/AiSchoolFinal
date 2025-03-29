@@ -7,8 +7,8 @@ const isProduction = process.env.NODE_ENV === 'production';
 // Connection configurations
 const DB_HOST = isProduction ? 'quiz-database-8ags' : 'localhost';
 const DB_PORT = process.env.DB_PORT || 3306;
-const DB_USER = process.env.DB_USER || 'root';
-const DB_PASSWORD = process.env.DB_PASSWORD || '';
+const DB_USER = process.env.DB_USER || 'Sara'
+const DB_PASSWORD = process.env.DB_PASSWORD || 'Sara0330!!';
 const DB_NAME = process.env.DB_NAME || 'aischool';
 
 // Print detailed connection info (without sensitive data)
