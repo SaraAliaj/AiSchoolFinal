@@ -119,47 +119,66 @@ def format_chat_history(chat_history):
 
 def get_user_info(query):
     """Get user information based on a natural language query"""
+    print(f"\n=== User info request: '{query}' ===")
     connection = get_db_connection()
     if connection is None:
+        print("Failed to establish database connection")
         return "Sorry, I couldn't connect to the database."
     
+    cursor = None
     try:
-        cursor = connection.cursor(dictionary=True)
+        # Determine cursor type dynamically based on connection type
+        if hasattr(connection, 'cursor'):
+            if 'dictionary' in str(type(connection)):
+                # mysql.connector with dictionary cursor already
+                cursor = connection.cursor()
+            else:
+                # mysql.connector without dictionary cursor
+                cursor = connection.cursor(dictionary=True)
+        else:
+            # pymysql or other types
+            cursor = connection.cursor()
+        
+        print("Database connection and cursor created successfully")
         
         # Extract potential email from query
         email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
         email_match = re.search(email_pattern, query)
         
-        # Extract potential username from query
-        username_pattern = r'\b(?:what is |what\'s |find |get |show |about )?(\w+)(?:\'s)?\s*(?:email|information|info|details)?'
+        # Extract potential username from query (improved pattern)
+        username_pattern = r'\b(?:what is |what\'s |find |get |show |tell me about |about |for )?\s*(\w+)(?:\'s)?\s*(?:email|information|info|details|profile)?'
         username_match = re.search(username_pattern, query.lower())
         
+        params = None
         if email_match:
             # Search by email
             email = email_match.group(0)
-            cursor.execute(
-                """
+            print(f"Searching for user by email: {email}")
+            query_str = """
                 SELECT u.id, u.username, u.email, u.role, u.active
                 FROM users u
                 WHERE u.email = %s
-                """,
-                (email,)
-            )
+            """
+            params = (email,)
         elif username_match:
             # Search by username
             username = username_match.group(1)
-            cursor.execute(
-                """
+            print(f"Searching for user by username: {username}")
+            query_str = """
                 SELECT u.id, u.username, u.email, u.role, u.active
                 FROM users u
                 WHERE u.username LIKE %s
-                """,
-                (f"%{username}%",)
-            )
+            """
+            params = (f"%{username}%",)
         else:
+            print("Could not extract username or email from query")
             return "I couldn't understand which user you're asking about. Please specify a username or email."
         
+        print(f"Executing query: {query_str} with params: {params}")
+        cursor.execute(query_str, params)
         user = cursor.fetchone()
+        
+        print(f"Query result: {user}")
         if not user:
             return "I couldn't find any user matching your query."
 
@@ -174,6 +193,7 @@ def get_user_info(query):
         response += f"📊 Status: {status}\n\n"
 
         # Now fetch all sections for the user
+        print(f"Fetching personal information for user_id: {user_id}")
         cursor.execute(
             """
             SELECT section_name, section_data
@@ -184,6 +204,7 @@ def get_user_info(query):
         )
         
         sections_rows = cursor.fetchall()
+        print(f"Found {len(sections_rows)} personal information sections")
         sections_data = {}
         
         # Process each section
@@ -195,7 +216,8 @@ def get_user_info(query):
                     else:
                         section_data = row['section_data']
                     sections_data[row['section_name']] = section_data
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing section data for {row['section_name']}: {e}")
                     continue
 
         # Format profile section
@@ -255,74 +277,68 @@ def get_user_info(query):
                 response += f"• Open Source Contribution: {'Yes' if prog['hasOpenSource'] else 'No'}\n"
             response += "\n"
 
-        # Format database section
-        if 'database' in sections_data:
-            response += "🗄️ Database Skills\n"
-            db = sections_data['database']
-            if db.get('databaseSystems') and isinstance(db['databaseSystems'], list) and db['databaseSystems']:
-                response += f"• Database Systems: {', '.join(db['databaseSystems'])}\n"
-            if db.get('apiTechnologies'):
-                response += f"• API Technologies: {db['apiTechnologies']}\n"
-            if db.get('otherDatabases'):
-                response += f"• Other Databases: {db['otherDatabases']}\n"
-            if 'hasBackendExperience' in db:
-                response += f"• Backend Experience: {'Yes' if db['hasBackendExperience'] else 'No'}\n"
-            response += "\n"
-
-        # Format AI section
-        if 'ai' in sections_data:
-            response += "🤖 AI & Emerging Tech\n"
-            ai = sections_data['ai']
-            if ai.get('aiExperience'):
-                response += f"• AI Experience Level: {ai['aiExperience']}\n"
-            if ai.get('tools') and isinstance(ai['tools'], list) and ai['tools']:
-                response += f"• AI Tools: {', '.join(ai['tools'])}\n"
-            if ai.get('otherTools'):
-                response += f"• Other AI Tools: {ai['otherTools']}\n"
-            if 'hasML' in ai:
-                response += f"• Machine Learning: {'Yes' if ai['hasML'] else 'No'}\n"
-            if 'hasAIModels' in ai:
-                response += f"• AI Model Development: {'Yes' if ai['hasAIModels'] else 'No'}\n"
-            response += "\n"
-
-        # Format collaboration section
-        if 'collaboration' in sections_data:
-            response += "👥 Collaboration\n"
-            collab = sections_data['collaboration']
-            if collab.get('collaborationRole'):
-                response += f"• Role: {collab['collaborationRole']}\n"
-            if collab.get('competitionExperience'):
-                response += f"• Competition Experience: {collab['competitionExperience']}\n"
-            if 'hasCompetitions' in collab:
-                response += f"• Competitions: {'Yes' if collab['hasCompetitions'] else 'No'}\n"
-            if collab.get('additionalInfo'):
-                response += f"• Additional Info: {collab['additionalInfo']}\n"
-            response += "\n"
-
         return response.strip()
             
-    except Error as e:
-        print(f"Error querying user information: {e}")
-        return "Sorry, there was an error retrieving the user information."
+    except Exception as e:
+        print(f"Error in get_user_info: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return f"Sorry, there was an error retrieving the user information: {str(e)}"
     finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
+        if cursor:
+            try:
+                cursor.close()
+            except:
+                pass
+        if connection:
+            try:
+                if hasattr(connection, 'is_connected') and connection.is_connected():
+                    connection.close()
+                elif hasattr(connection, 'close'):
+                    connection.close()
+            except:
+                pass
+        print("Database connection closed in get_user_info")
 
 def chat_with_grok(user_input, lesson_id=None, chat_history=None):
     """Send a request to the Grok API and return the response"""
     try:
         # Check if this is a user information query
-        user_info_keywords = ['email', 'information', 'info', 'details', 'contact']
-        is_user_query = any(keyword in user_input.lower() for keyword in user_info_keywords) and (
-            'what' in user_input.lower() or 
-            'who' in user_input.lower() or
-            'find' in user_input.lower() or
-            'get' in user_input.lower() or
-            'show' in user_input.lower()
-        )
+        user_info_keywords = ['email', 'information', 'info', 'details', 'contact', 'profile', 'about', 'tell me about']
         
+        # Extract potential username patterns
+        username_pattern = r'\b(?:what is |what\'s |find |get |show |tell me about |about |for )?\s*(\w+)(?:\'s)?\s*(?:email|information|info|details|profile)?'
+        username_match = re.search(username_pattern, user_input.lower())
+        
+        # Check for email pattern
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        email_match = re.search(email_pattern, user_input)
+        
+        # Determine if this is a user query
+        is_user_query = False
+        
+        # Check for explicit references to a user in the input
+        if username_match and username_match.group(1):
+            potential_username = username_match.group(1).strip().lower()
+            # Skip common words that might match but aren't usernames
+            skip_words = ['you', 'me', 'i', 'we', 'they', 'them', 'it', 'that', 'this', 'these', 'those', 'what', 'who']
+            if potential_username and potential_username not in skip_words:
+                if any(keyword in user_input.lower() for keyword in user_info_keywords):
+                    print(f"Detected potential user query for username: {potential_username}")
+                    is_user_query = True
+                
+        # Check for email pattern which is a strong signal of a user query
+        if email_match:
+            print(f"Detected email in query: {email_match.group(0)}")
+            is_user_query = True
+            
+        # Special case: check for phrases like "tell me about sara"
+        if re.search(r'\b(?:tell|show|give)\s+(?:me|us)\s+(?:about|info)\s+(\w+)\b', user_input.lower()):
+            print("Detected 'tell me about X' pattern")
+            is_user_query = True
+            
         if is_user_query:
+            print(f"Processing as user info query: {user_input}")
             return get_user_info(user_input)
             
         # Get X.AI API key
@@ -440,65 +456,77 @@ DB_CONFIG = {
 def get_db_connection():
     try:
         # Use Config class for database configuration
-        db_config = {
-            'host': Config.DB_HOST,
-            'user': Config.DB_USER,
-            'password': Config.DB_PASSWORD,
-            'database': Config.DB_NAME
-        }
+        db_config = Config.get_db_config()
         
         print("Attempting to connect to MySQL database with config:", {
             **db_config,
             'password': '***'  # Hide password in logs
         })
         
-        connection = mysql.connector.connect(**db_config)
+        # Try with mysql.connector first (which is more reliable in production)
+        try:
+            import mysql.connector
+            from mysql.connector import Error
+            connection = mysql.connector.connect(**db_config)
+            
+            if connection.is_connected():
+                db_info = connection.get_server_info()
+                print(f"Successfully connected to MySQL Server version {db_info}")
+                
+                # Test the connection by executing a simple query
+                cursor = connection.cursor(dictionary=True)  # Use dictionary cursor
+                cursor.execute("SELECT DATABASE()")
+                database_name = cursor.fetchone()['DATABASE()']
+                print(f"Connected to database: {database_name}")
+                
+                # Test the tables
+                cursor.execute("SHOW TABLES")
+                tables = cursor.fetchall()
+                print(f"Tables in database: {[t['Tables_in_'+Config.DB_NAME] for t in tables]}")
+                
+                cursor.close()
+                return connection
+        except Exception as mysql_connector_error:
+            print(f"mysql.connector error: {mysql_connector_error}")
+            print("Falling back to pymysql...")
+            
+        # Fall back to pymysql as backup connection method
+        import pymysql
+        connection = pymysql.connect(
+            **db_config,
+            cursorclass=pymysql.cursors.DictCursor
+        )
         
-        if connection.is_connected():
-            db_info = connection.get_server_info()
-            print(f"Successfully connected to MySQL Server version {db_info}")
+        if connection.open:
+            print("Successfully connected using pymysql")
             
             # Test the connection by executing a simple query
             cursor = connection.cursor()
             cursor.execute("SELECT DATABASE()")
-            database_name = cursor.fetchone()[0]
+            database_name = cursor.fetchone()['DATABASE()']
             print(f"Connected to database: {database_name}")
             
-            # Test the chat_history table
-            try:
-                cursor.execute("SHOW TABLES LIKE 'chat_history'")
-                if cursor.fetchone():
-                    print("chat_history table exists")
-                    cursor.execute("DESCRIBE chat_history")
-                    columns = cursor.fetchall()
-                    print("chat_history table structure:")
-                    for column in columns:
-                        print(f"- {column[0]}: {column[1]}")
-                else:
-                    print("chat_history table does not exist!")
-                    # Create the table if it doesn't exist
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS chat_history (
-                            id INT AUTO_INCREMENT PRIMARY KEY,
-                            message TEXT NOT NULL,
-                            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                        )
-                    """)
-                    connection.commit()
-                    print("Created chat_history table")
-            except Error as e:
-                print(f"Error checking chat_history table: {e}")
+            # Test the tables
+            cursor.execute("SHOW TABLES")
+            tables = cursor.fetchall()
+            print(f"Tables in database: {tables}")
             
             cursor.close()
             return connection
-        else:
-            print("Failed to establish database connection")
-            return None
             
-    except Error as e:
+        print("Failed to establish database connection")
+        return None
+            
+    except Exception as e:
         print(f"Error connecting to MySQL database: {e}")
-        if 'connection' in locals() and connection.is_connected():
-            connection.close()
+        if 'connection' in locals():
+            try:
+                if hasattr(connection, 'is_connected') and connection.is_connected():
+                    connection.close()
+                elif hasattr(connection, 'open') and connection.open:
+                    connection.close()
+            except:
+                pass
         return None
 
 def save_chat_message(message):
