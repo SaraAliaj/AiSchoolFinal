@@ -48,8 +48,14 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
         lessonName: ''
     });
     const [onlineUsers, setOnlineUsers] = useState<User[]>([]);
+    const { toast } = useToast();
 
     useEffect(() => {
+        if (!userId) {
+            console.log('WebSocketProvider: No userId provided, skipping connection');
+            return;
+        }
+
         // Connect to the Socket.IO server
         const socketUrl = process.env.NODE_ENV === 'production' 
             ? 'wss://quiz-node-backend.onrender.com'
@@ -81,8 +87,18 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
 
             if (data.type === 'lesson_started') {
                 setShowStartNotification(true);
+                toast({
+                    title: "Lesson Started",
+                    description: `${lessonName} has been started by ${userName}`,
+                    duration: 5000
+                });
             } else if (data.type === 'lesson_ended') {
                 setShowEndNotification(true);
+                toast({
+                    title: "Lesson Ended",
+                    description: `${lessonName} has been ended by ${userName}`,
+                    duration: 5000
+                });
             }
         });
 
@@ -140,11 +156,11 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
         // Cleanup function
         return () => {
             console.log('Cleaning up WebSocket connection');
-            if (socket?.connected) {
-                socket.disconnect();
+            if (newSocket?.connected) {
+                newSocket.disconnect();
             }
         };
-    }, [userId]);
+    }, [userId, toast]);
 
     const startLesson = (lessonId: string, userName: string, lessonName: string) => {
         if (socket?.connected) {

@@ -16,6 +16,14 @@ const production: Config = {
     wsUrl: 'wss://quiz-python-backend.onrender.com'
 };
 
-const config: Config = import.meta.env.PROD ? production : development;
+// Get runtime environment - check if window location is production
+const isProd = typeof window !== 'undefined' && 
+    (window.location.hostname === 'aiacademia.tech' || 
+     window.location.hostname.includes('render.com'));
+
+// Use environment-aware configuration
+const config: Config = isProd || import.meta.env.PROD ? production : development;
+
+console.log('Using configuration:', config);
 
 export default config; 

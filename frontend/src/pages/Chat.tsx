@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/server/api";
 import config from '@/config';
+import { useToast } from "@/components/ui/use-toast";
 
 interface Message {
   id: string;
@@ -18,6 +19,7 @@ interface Message {
 
 export default function Chat() {
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([{
     id: '1',
     content: `❤️⚫️ Welcome to AlbaAI ${user?.username ? user.username : ''} – your intelligent assistant from Albania! We empower the government to work more efficiently, optimize resources, and provide better services to citizens. Let's shape a more connected and tech-driven future for our beautiful country together! 🚀 ❤️⚫️`,
@@ -26,6 +28,7 @@ export default function Chat() {
   }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const socketRef = useRef<WebSocket | null>(null);
 
@@ -52,6 +55,7 @@ export default function Chat() {
               messageContent += `No lessons scheduled for today.`;
             }
           } catch (error) {
+            console.error('Failed to fetch today\'s lesson:', error);
             messageContent += `No lessons scheduled for today.`;
           }
 
@@ -65,6 +69,11 @@ export default function Chat() {
         }
       } catch (error) {
         console.error('Failed to fetch initial information:', error);
+        toast({
+          title: "Failed to load information",
+          description: "Could not load today's schedule information. Please try refreshing.",
+          variant: "destructive"
+        });
       }
     };
 
@@ -72,7 +81,7 @@ export default function Chat() {
     setTimeout(() => {
       fetchInitialInfo();
     }, 500);
-  }, []);
+  }, [toast]);
 
   // Track loading state changes
   useEffect(() => {
@@ -99,6 +108,7 @@ export default function Chat() {
         ws.onopen = () => {
           console.log('Connected to Grok AI WebSocket server');
           socketRef.current = ws;
+          setWsConnected(true);
         };
         
         ws.onmessage = (event) => {
@@ -136,20 +146,29 @@ export default function Chat() {
               timestamp: new Date()
             };
             setMessages(prev => [...prev, errorMessage]);
+            setIsLoading(false);
           }
         };
         
         ws.onerror = (error) => {
           console.error('WebSocket error:', error);
           setIsLoading(false);
+          setWsConnected(false);
+          toast({
+            title: "Connection Error",
+            description: "Could not connect to the AI service. Will try again shortly.",
+            variant: "destructive"
+          });
         };
         
         ws.onclose = () => {
           console.log('WebSocket connection closed');
+          setWsConnected(false);
           setTimeout(connectWebSocket, 3000);
         };
       } catch (error) {
         console.error('Failed to connect to WebSocket:', error);
+        setWsConnected(false);
         setTimeout(connectWebSocket, 3000);
       }
     };
@@ -160,7 +179,7 @@ export default function Chat() {
         socketRef.current.close();
       }
     };
-  }, []);
+  }, [toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

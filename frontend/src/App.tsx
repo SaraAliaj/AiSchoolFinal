@@ -32,15 +32,18 @@ const AdminRoute = ({ children }) => {
 
 // WebSocket enabled route component
 const WebSocketEnabledRoute = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   
-  if (!user) {
+  // If the authentication is still loading or user is not authenticated,
+  // render children without WebSocketProvider
+  if (!isAuthenticated || !user) {
+    console.log('WebSocketEnabledRoute: User not authenticated, skipping WebSocketProvider');
     return children;
   }
   
   return (
     <WebSocketProvider 
-      userId={user.id.toString()}
+      userId={user.id?.toString()}
       username={user.username}
       role={user.role}
     >
