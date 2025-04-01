@@ -1981,28 +1981,47 @@ app.get('/api/today-lesson', verifyToken, async (req, res) => {
     // Convert to our day_id format (1 = Monday, 2 = Tuesday, etc.)
     const dayId = today === 0 ? 7 : today;
     
-    console.log('Fetching lesson for day:', dayId);
+    console.log('Fetching lesson for day:', dayId, 'User ID:', req.userId);
+    
+    // Log database connection status
+    try {
+      await promisePool.query('SELECT 1');
+      console.log('Database connection is active');
+    } catch (dbError) {
+      console.error('Database connection error:', dbError);
+      return res.status(500).json({ 
+        message: 'Database connection error', 
+        error: dbError.message 
+      });
+    }
     
     // Simplified query to get any lesson for this day
     const query = `
-      SELECT l.title, l.lesson_name
+      SELECT l.id, l.title, l.lesson_name
       FROM lessons l
       WHERE l.day_id = ?
       ORDER BY l.week_id ASC, l.order_index ASC
       LIMIT 1
     `;
     
+    console.log('Executing query:', query.replace(/\s+/g, ' ').trim());
+    
     const [rows] = await promisePool.query(query, [dayId]);
     console.log('Query result:', rows);
     
     if (rows.length === 0) {
+      console.log('No lesson found for day:', dayId);
       return res.status(404).json({ message: 'No lesson found for today' });
     }
     
     res.json(rows[0]);
   } catch (error) {
     console.error('Error fetching today\'s lesson:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 
