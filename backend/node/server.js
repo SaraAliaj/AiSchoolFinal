@@ -1997,10 +1997,10 @@ app.get('/api/today-lesson', verifyToken, async (req, res) => {
     
     // Simplified query to get any lesson for this day
     const query = `
-      SELECT l.id, l.title, l.lesson_name
+      SELECT l.id, l.lesson_name, l.file_path
       FROM lessons l
       WHERE l.day_id = ?
-      ORDER BY l.week_id ASC, l.order_index ASC
+      ORDER BY l.week_id ASC, l.id ASC
       LIMIT 1
     `;
     
