@@ -52,7 +52,7 @@ export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children, 
     useEffect(() => {
         // Connect to the Socket.IO server
         const socketUrl = process.env.NODE_ENV === 'production' 
-            ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`
+            ? 'wss://quiz-node-backend.onrender.com' // Use the domain where your backend is hosted
             : 'ws://localhost:3000';
 
         console.log('Connecting to Socket.IO server:', socketUrl);
