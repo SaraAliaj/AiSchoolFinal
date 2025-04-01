@@ -46,8 +46,8 @@ export default function Chat() {
           // Add today's lesson info if available
           try {
             const todayLesson = await api.getTodayLesson();
-            if (todayLesson && todayLesson.title) {
-              messageContent += `Your lesson for today is: ${todayLesson.title}`;
+            if (todayLesson && todayLesson.lesson_name) {
+              messageContent += `Your lesson for today is: ${todayLesson.lesson_name}`;
             } else {
               messageContent += `No lessons scheduled for today.`;
             }
